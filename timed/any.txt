@@ -1,0 +1,85 @@
+
+struct AbsInsnNodes {
+    AbsInsnNode* nodes;
+    size_t size;
+
+    NODISCARD inline auto* begin(this auto&& self) noexcept {
+        return self.nodes;
+    }
+
+    NODISCARD inline auto* end(this auto&& self) noexcept {
+        return self.nodes + self.size;
+    }
+
+    explicit AbsInsnNodes(AbsInsnNode* nodes, const size_t size) : nodes(nodes), size(size) {};
+    explicit AbsInsnNodes() : nodes(new AbsInsnNode[0]), size(0) {};
+};
+
+            NODISCARD constexpr bool is_empty_and_destruct_if() const noexcept {
+                const bool ret = is_empty();
+                if (ret) {
+                    destruct();
+                }
+                return ret;
+            }
+
+        constexpr void insert(ElementT&& element, const size_t index) noexcept {
+            insert(new Node{std::move(element)}, index);
+        }
+
+        template <DestructMode destructOldValueMode = DestructMode::DESTRUCT>
+        constexpr void set(const size_t index, ElementT&& element) noexcept {
+            set<destructOldValueMode>(index, new Node{std::move(element)});
+        }
+
+        constexpr void remove(const size_t index) noexcept {
+
+        }
+
+        constexpr void remove(Node& node) noexcept {
+
+        }
+
+        constexpr void insert(Node& node, const size_t index) noexcept {
+            assert(index < cache.size());
+
+            if (index == 0) {
+                append<true>(node);
+            } else if (index == cache.size()) {
+                append(node);
+            } else {
+                const auto presentPrevnearstNode = get_offsetnearst_cache_node<OffsetSide::PREV>(index - 1);
+
+                if (presentPrevnearstNode) {
+                    node.nextNode = presentPrevnearstNode->nextNode;
+                    node.prevNode = presentPrevnearstNode;
+                    presentPrevnearstNode->nextNode->prevNode = &node;
+                    presentPrevnearstNode->nextNode = &node;
+                } else {
+
+                }
+
+                dynamicSize++;
+            }
+        }
+
+        template <DestructMode destructOldValueMode = DestructMode::DESTRUCT>
+        constexpr void set(const size_t index, Node& newNode) noexcept {
+            assert(index < cache.size());
+
+            auto* oldNode = cache[index];
+
+            newNode.prevNode = oldNode->prevNode;
+            newNode.nextNode = oldNode->nextNode;
+            oldNode->prevNode->nextNode = &newNode;
+            oldNode->nextNode->prevNode = &newNode;
+
+            if constexpr (destructOldValueMode == DestructMode::DESTRUCT) {
+                delete oldNode;
+            } else if constexpr (destructOldValueMode == DestructMode::CLEAR) {
+                oldNode->prevNode = nullptr;
+                oldNode->nextNode = nullptr;
+            }
+
+            cache[index] = newNode;
+        }
