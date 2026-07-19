@@ -5,6 +5,8 @@ module;
 
 export module cstd_variant;
 
+import simple_cstd;
+
 template <bool hasNullptr = false, typename... DerefTypes>
 using deref_to_ref_variant = std::conditional_t<
     hasNullptr,
@@ -14,10 +16,10 @@ using deref_to_ref_variant = std::conditional_t<
 export {
     namespace cstd {
         namespace mixins {
-            template <size_t emptyTypeIdx = 0, typename EmptyType>
+            template <typename EmptyType, size_t emptyTypeIdx = 0>
             struct emptiable_variant_mixin {
                 using EmptyT = EmptyType;
-                constexpr size_t emptyIdx = emptyTypeIdx;
+                static constexpr size_t emptyIdx = emptyTypeIdx;
 
                 NODISCARD constexpr bool is_empty(this auto&& self) noexcept {
                     return self.index() == emptyTypeIdx;
@@ -29,13 +31,13 @@ export {
             };
 
             template <typename DerefEmptyType, size_t emptyTypeIdx = 0>
-            struct emptiable_variant_of_ptrs_mixin : emptiable_variant_mixin<emptyTypeIdx, DerefEmptyType*> {
+            struct emptiable_variant_of_ptrs_mixin : emptiable_variant_mixin<DerefEmptyType*, emptyTypeIdx> {
                 using DerefEmptyT = DerefEmptyType;
             };
 
             template <size_t nullTypeIdx = 0>
             struct nullable_variant_of_ptrs_mixin {
-                constexpr size_t nullIdx = nullTypeIdx;
+                static constexpr size_t nullIdx = nullTypeIdx;
 
                 NODISCARD constexpr bool is_null(this auto&& self) noexcept {
                     return self.index() == nullTypeIdx;
@@ -62,8 +64,8 @@ export {
 
 
         template <bool hasNullptr = false, typename... DerefTypes>
-        struct variant_of_ptrs : deref_to_ref_variant<hasNullptr, DerefTypes> {
-            using deref_to_ref_variant<hasNullptr, DerefTypes...>::variant;
+        struct variant_of_ptrs : deref_to_ref_variant<hasNullptr, DerefTypes...> {
+            using deref_to_ref_variant<hasNullptr, DerefTypes...>::deref_to_ref_variant;
 
             NODISCARD constexpr void* get_raw_ptr() const noexcept {
                 return std::visit([] (auto self) {
@@ -72,8 +74,11 @@ export {
             }
 
             constexpr void destruct_deref() const noexcept {
-                std::visit([] (const auto* self) {
-                    delete self;
+                std::visit(overload{
+                    [] (const auto* self) {
+                        delete self;
+                    },
+                    [] (const nullptr_t) {}
                 }, *this);
             }
 

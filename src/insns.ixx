@@ -19,6 +19,7 @@ import cached_2linked_list;
 
 export {
     struct AbsInsnNode;
+
     struct AbstractInsnNode {
         friend AbsInsnNode;
     private:
@@ -27,26 +28,22 @@ export {
 #endif
     };
 
-    template <typename NodeType>
-    struct Cached2LinkedList;
-
-    using InsnList = Cached2LinkedList<AbsInsnNode>;
-
     struct AbsInsnNode : cstd::variant_of_nullable_ptrs<> {
-        friend InsnList;
+        template <typename, bool>
+        friend struct c2l_list::BList;
 
     private:
 #if DEBUG
-        NODISCARD constexpr bool NAME_IN_L2C_LIST(mark_unnew)() noexcept {
+        NODISCARD constexpr bool NAME_IN_L2C_LIST(mark_unnew)() const noexcept {
             return this->SET_ASBT_INSN_FIELD(isNew, false);
         }
 
-        NODISCARD constexpr bool NAME_IN_L2C_LIST(is_valid_new)(this auto&& self) noexcept {
+        NODISCARD constexpr bool NAME_IN_L2C_LIST(is_valid_new)(this auto&& self) const noexcept {
             return self.is_not_null() && this->GET_ASBT_INSN_FM(isNew);
         }
 #endif
 
-        NODISCARD constexpr void NAME_IN_L2C_LIST(destruct)() noexcept {
+        constexpr void NAME_IN_L2C_LIST(destruct)() const noexcept {
             destruct_deref();
         }
 
@@ -59,5 +56,6 @@ export {
         }
     };
 
-    template struct Cached2LinkedList<AbsInsnNode>;
+    using InsnList = c2l_list::CList<AbsInsnNode>;
+    using InsnAdderList = c2l_list::BList<AbsInsnNode>;
 }

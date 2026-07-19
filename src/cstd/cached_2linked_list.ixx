@@ -11,131 +11,121 @@ module;
 export module cached_2linked_list;
 
 export namespace c2l_list {
-    template <typename ElementType, typename Self>
-    struct Node {
-        Self* nextNode = nullptr;
-        Self* prevNode = nullptr;
-        size_t sourceIndex = -2;
-        ElementType node;
-
-        NODISCARD constexpr bool isNew() const noexcept {
-            return sourceIndex == -2;
-        }
-
-        constexpr void markAdded() noexcept {
-            sourceIndex = -1;
-        }
-
-        // ReSharper disable once CppNonExplicitConvertingConstructor
-        constexpr Node(ElementType&& node) : node(std::move(node)) noexcept {
-            assert(node.NAME_IN_L2C_LIST(is_valid_new)());
-            node.NAME_IN_L2C_LIST(mark_unnew)();
-        }
-
-        constexpr Node() : Node(ElementType::NAME_IN_L2C_LIST(create_empty)()) noexcept {
-        }
-
-        ~Node() noexcept {
-            node.NAME_IN_L2C_LIST(destruct)();
-        }
-
-        NODISCARD constexpr bool is_empty() const noexcept {
-            return node.NAME_IN_L2C_LIST(is_empty)();
-        }
-
-        NODISCARD constexpr Self* get_next_nearstnext_present_node_and_destruct_empty() const noexcept {
-            auto* nextI = nextNode;
-            if (nextI) {
-                bool changed = false;
-                while (nextI && nextI->is_empty()) {
-                    changed = true;
-                    auto nextNextI = nextI->nextNode;
-                    delete nextI;
-                    nextI = nextNextI;
-                }
-                if (changed) {
-                    nextNode = nextI;
-                    if (nextI) {
-                        nextI->prevNode = this;
-                    }
-                }
-            }
-            return nextI;
-        }
-    };
-
-    template <typename ElementType>
-    struct NodeImpl : Node<ElementType, NodeImpl<ElementType>>{
-    };
-
     struct Base {
         enum class OffsetSide { PREV, NEXT, NONE };
-
         enum class DestructMode { DESTRUCT, CLEAR, NONE };
     };
 
     template <typename ElementType>
-    struct AdderList;
+    struct BList {
+        template <typename, bool>
+        friend struct AdderList;
 
-    template <typename ElementType, typename NodeType = NodeImpl<ElementType>, typename AdderListType = AdderList<ElementType>>
-    struct List : protected Base {
-        using ElementT = ElementType;
-        using NodeT = NodeType;
-        using AdderListT = AdderListType;
+        struct Node;
 
-        using Nodes = std::span<NodeType*>;
+        struct NodeBase {
+            static constexpr size_t unaddedSIdx = static_cast<size_t>(-2);
+            static constexpr size_t addedSIdx = static_cast<size_t>(-1);
 
-    protected:
-        NodeType* first = nullptr;
-        NodeType* last = nullptr;
-        Nodes cache = {};
-        size_t dynamicSize = 0;
+            Node* nextNode = nullptr;
+            Node* prevNode = nullptr;
+            size_t sourceIndex = unaddedSIdx;
+            ElementType instance;
+        };
 
-        constexpr void destruct_cache() noexcept {
-            delete[] cache.data();
-            cache = {};
-        }
+        struct Node : protected NodeBase {
+        private:
+            using NodeBase::nextNode;
+            using NodeBase::prevNode;
+            using NodeBase::sourceIndex;
+            using NodeBase::instance;
+        public:
+            using NodeBase::unaddedSIdx;
+            using NodeBase::addedSIdx;
 
-        constexpr void deep_destruct_cache() noexcept {
-            for (auto node : cache) {
-                delete node;
+            friend BList;
+
+            NODISCARD constexpr const NodeBase& getData() const noexcept {
+                return *this;
             }
-            destruct_cache();
-        }
 
-    public:
-        explicit constexpr List() noexcept = default;
+            NODISCARD constexpr bool isNew() const noexcept {
+                return sourceIndex == unaddedSIdx;
+            }
 
-        template <bool sourceIndexUpdate = true>
-        constexpr auto to_span() noexcept {
-            destruct_cache();
-            auto* array = new Node*[dynamicSize];
-            auto* j = array;
+            constexpr void markAdded() noexcept {
+                sourceIndex = addedSIdx;
+            }
+
+            // ReSharper disable once CppNonExplicitConvertingConstructor
+            constexpr Node(ElementType&& node) noexcept : instance(std::move(node)) {
+                assert(node.NAME_IN_L2C_LIST(is_valid_new)());
+                node.NAME_IN_L2C_LIST(mark_unnew)();
+            }
+
+            constexpr Node() noexcept : Node(create_empty_element_instance()) {
+            }
+
+            ~Node() noexcept {
+                instance.NAME_IN_L2C_LIST(destruct)();
+            }
+
+            NODISCARD constexpr bool is_empty() const noexcept {
+                return instance.NAME_IN_L2C_LIST(is_empty)();
+            }
+
+            NODISCARD constexpr void mark_empty() noexcept {
+                create_empty_element_instance();
+            }
+
+        private:
+            NODISCARD constexpr static ElementType create_empty_element_instance() noexcept {
+                return ElementType::NAME_IN_L2C_LIST(create_empty)();
+            }
+
+            NODISCARD constexpr Node* get_next_nearstnext_present_node_and_destruct_empty() noexcept {
+                auto* nextI = nextNode;
+                if (nextI) {
+                    bool changed = false;
+                    while (nextI && nextI->is_empty()) {
+                        changed = true;
+                        auto nextNextI = nextI->nextNode;
+                        delete nextI;
+                        nextI = nextNextI;
+                    }
+                    if (changed) {
+                        nextNode = nextI;
+                        if (nextI) {
+                            connect(this, nextI);
+                        }
+                    }
+                }
+                return nextI;
+            }
+        };
+
+        ~BList() noexcept {
             auto* node = first;
             if (node) {
-                for (size_t i = 0; i < dynamicSize;) {
-                    *j = node;
-                    if constexpr (sourceIndexUpdate) {
-                        node.sourceIndex = i;
-                    }
-                    node = node->get_next_nearstnext_present_node_and_destruct_empty();
-                    ++i;
-                    ++j;
-                }
+                do {
+                    auto* nextNode = node->nextNode;
+                    delete node;
+                    node = nextNode;
+                } while (node);
             }
-            cache = {array, dynamicSize};
-            return cache;
         }
 
-        ~List() noexcept {
-            to_span<false>();
-            deep_destruct_cache();
+        template <bool inStart = false>
+        constexpr void append(ElementType&& element) noexcept {
+            append<inStart>(new Node{std::move(element)});
         }
 
-        NODISCARD constexpr auto get_cache_span() const noexcept {
-            return cache;
-        }
+    protected:
+        Node* first = nullptr;
+        Node* last = nullptr;
+        size_t dynamicSize = 0;
 
+    public:
         NODISCARD constexpr auto get_dynamic_size() const noexcept {
             return dynamicSize;
         }
@@ -148,39 +138,35 @@ export namespace c2l_list {
             return last;
         }
 
-        template <OffsetSide side>
-        NODISCARD constexpr NodeType* get_offsetnearst_cache_node(const size_t index) const noexcept {
-            auto* node = cache[index];
-            do {
-                if constexpr (side == OffsetSide::PREV) {
-                    node = node->prevNode;
-                } else if constexpr (side == OffsetSide::NEXT) {
-                    node = node->nextNode;
-                } else if constexpr (side == OffsetSide::NONE) {
-                    return node;
-                }
-            } while (node && node->is_empty());
-            return node;
-        }
-
         template <bool inStart = false>
-        constexpr void append(ElementT&& element) noexcept {
-            append<inStart>(new Node{std::move(element)});
+        constexpr void append(BList&& otherList) noexcept {
+            if (otherList.first) {
+                if constexpr (inStart) {
+                    connect(otherList.last, first);
+                    first = otherList.first;
+                } else {
+                    connect(last, otherList.first);
+                    last = otherList.last;
+                }
+
+                otherList.first = nullptr;
+                dynamicSize += otherList.dynamicSize;
+            }
         }
 
-        template <bool before = false>
-        constexpr void insert(ElementT&& element, const size_t index) noexcept {
-            assert(index < cache.size());
-            insert<before>(new Node{std::move(element)}, cache[index]);
+        constexpr void clearEmpty() noexcept {
+            auto* node = first;
+            while (node) {
+                node = node->get_next_nearstnext_present_node_and_destruct_empty();
+            }
         }
 
     protected:
         template <bool inStart = false>
-        constexpr void append(NodeType* node) noexcept {
+        constexpr void append(const Node* node) noexcept {
             if (!first && node->is_empty()) {
                 first = node;
                 last = node;
-                cache = {node, 1};
             } else {
                 if constexpr (inStart) {
                     connect(node, first);
@@ -194,45 +180,149 @@ export namespace c2l_list {
         }
 
         template <bool before = false>
-        constexpr void insert(NodeType* node, const size_t index) noexcept {
-            assert(index < cache.size());
-            insert<before>(node, cache[index]);
-        }
-
-        template <bool before = false>
-        constexpr void insert(NodeType* node, NodeType* sideNode) noexcept {
+        constexpr void insert(const Node* node, const Node* sideNode) noexcept {
             assert(node && sideNode);
 
             if constexpr (before) {
                 auto& nextNode = sideNode;
                 if (first == nextNode) {
-                    first = node;
-                } else {
-                    connect(nextNode->prevNode, node)
+                    append<before>(node);
+                    return;
                 }
-                connect(node, nextNode);
+
+                connect(nextNode->prevNode, node, nextNode);
             } else {
                 auto& prevNode = sideNode;
                 if (last == prevNode) {
-                    last = node;
-                } else {
-                    connect(node, prevNode->nextNode)
+                    append<before>(node);
+                    return;
                 }
-                connect(prevNode, node);
+
+                connect(prevNode, node, prevNode->nextNode);
             }
 
             dynamicSize++;
         }
 
-        static constexpr void connect(NodeType* left, NodeType* right) noexcept {
+        template <bool before = false>
+        constexpr void insert(BList&& otherList, const Node* sideNode) noexcept {
+            assert(sideNode);
+
+            if constexpr (before) {
+                auto& nextNode = sideNode;
+                if (first == nextNode) {
+                    append<before>(otherList);
+                    return;
+                }
+
+                connect(nextNode->prevNode, otherList, nextNode);
+            } else {
+                auto& prevNode = sideNode;
+                if (last == prevNode) {
+                    append<before>(otherList);
+                    return;
+                }
+
+                connect(prevNode, otherList, prevNode->nextNode);
+            }
+
+            otherList.first = nullptr;
+            dynamicSize += otherList.dynamicSize;
+        }
+
+        static constexpr void remove(const Node* node) {
+            connect(node->prevNode, node->nextNode);
+            delete node;
+        }
+
+        static constexpr void markRemove(const Node* node) {
+            node->is_empty()
+        }
+
+        static constexpr void connect(const Node* left, const Node* right) noexcept {
             left->nextNode = right;
             right->prevNode = left;
         }
+
+        static constexpr void connect(const Node* left, const Node* middle, const Node* right) noexcept {
+            connect(left, middle);
+            connect(middle, right);
+        }
+
+        static constexpr void connect(const Node* left, const BList& middle, const Node* right) noexcept {
+            connect(left, middle.last);
+            connect(middle.first, right);
+        }
     };
 
-    template <typename Element>
-    struct AdderList : List<Element> {
-        explicit constexpr Cached2LinkedList() noexcept = default;
+    template <typename ElementType>
+    struct CList : BList<ElementType> {
+    protected:
+        using AdderListType = BList<ElementType>;
+        using AdderListType::dynamicSize;
+        using AdderListType::first;
+        using AdderListType::last;
+        using typename AdderListType::Node;
 
-    }
+    public:
+        using Nodes = std::span<Node*>;
+
+    protected:
+        Nodes cache = {};
+
+    public:
+        explicit constexpr CList() noexcept = default;
+
+        template <bool sourceIndexUpdate = true>
+        constexpr auto to_span() noexcept {
+            auto* array = new Node*[dynamicSize];
+            auto* j = array;
+            auto* node = first;
+            if (node) {
+                for (size_t i = 0; i < dynamicSize;) {
+                    *j = node;
+                    if constexpr (sourceIndexUpdate) {
+                        node->sourceIndex = i;
+                    }
+                    node = node->get_next_nearstnext_present_node_and_destruct_empty();
+                    ++i;
+                    ++j;
+                }
+            }
+            cache = {array, dynamicSize};
+            return cache;
+        }
+
+        NODISCARD constexpr auto get_cache_span() const noexcept {
+            return cache;
+        }
+
+        template <Base::OffsetSide side>
+        NODISCARD constexpr Node* get_offsetnearst_cache_node(const size_t index) const noexcept {
+            auto* node = cache[index];
+            do {
+                if constexpr (side == Base::OffsetSide::PREV) {
+                    node = node->prevNode;
+                } else if constexpr (side == Base::OffsetSide::NEXT) {
+                    node = node->nextNode;
+                } else if constexpr (side == Base::OffsetSide::NONE) {
+                    return node;
+                }
+            } while (node && node->is_empty());
+            return node;
+        }
+
+        template <bool before = false>
+        constexpr void insert(ElementType&& element, const size_t index) noexcept {
+            assert(index < cache.size());
+            insert<before>(new Node{std::move(element)}, cache[index]);
+        }
+
+    protected:
+        template <bool before = false>
+        constexpr void insert(const Node* node, const size_t index) noexcept {
+            assert(index < cache.size());
+            insert<before>(node, cache[index]);
+        }
+    };
 } // namespace c2l_list
