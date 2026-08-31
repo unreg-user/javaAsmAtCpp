@@ -9,6 +9,7 @@
       <file path="$PROJECT_DIR$/src" />
     </sourceRoots>
     <excludeRoots>
+      <file path="$PROJECT_DIR$/test" />
       <file path="$PROJECT_DIR$/timed" />
     </excludeRoots>
   </component>

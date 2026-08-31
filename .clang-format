@@ -41,7 +41,6 @@ IncludeIsMainRegex: '([-_](test|unittest))?$'
 IndentCaseLabels: true
 IndentWidth: 4
 InsertNewlineAtEOF: true
-MacroBlockBegin: ''
 MacroBlockEnd: ''
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
@@ -54,4 +53,5 @@ SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 TabWidth: 4
 AllowShortFunctionsOnASingleLine: false
+MacroBlockBegin: ''
 ...

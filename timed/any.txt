@@ -83,3 +83,455 @@ struct AbsInsnNodes {
 
             cache[index] = newNode;
         }
+    namespace traits {
+        template <typename Method, typename Field, typename RecordComponent>
+        struct ClassNT {
+            using MethodNType = Method;
+            using FieldNType = Field;
+            using RecordComponentNType = RecordComponent;
+        };
+    }
+
+
+
+        template <size_t to, size_t from, size_t... iterated>
+        struct TypeIterator : AbstractTypeIterator<to, from> {
+            using AbstractTypeIterator<to, from>::negative;
+            using AbstractTypeIterator<to, from>::positive;
+
+            using Result = std::conditional_t<
+                positive,
+                typename TypeIterator<to, from + 1, iterated..., from>::Result,
+                std::conditional_t<
+                    negative,
+                    typename TypeIterator<to, from - 1, iterated..., from>::Result,
+                    ValuesTraits<size_t, iterated...>
+                >
+            >;
+        };
+
+        template <size_t to, size_t from = 0>
+        using MakeTypeIterator = TypeIterator<to, from>;
+
+        template <size_t to, size_t from, typename... iterated>
+        struct VoidTypeIterator : AbstractTypeIterator<to, from> {
+            using AbstractTypeIterator<to, from>::negative;
+            using AbstractTypeIterator<to, from>::positive;
+
+            using Result = std::conditional_t<
+                positive,
+                typename VoidTypeIterator<to, from + 1, iterated..., void>::Result,
+                std::conditional_t<
+                    negative,
+                    typename VoidTypeIterator<to, from - 1, iterated..., void>::Result,
+                    TypesTraits<iterated...>
+                >
+            >;
+        };
+
+        template <size_t to, size_t from = 0>
+        using MakeVoidTypeIterator = VoidTypeIterator<to, from>;
+
+
+    /*namespace Tag {
+        using namespace const_i;
+
+
+
+        export {
+            using TypeUT = c_enum<TagType>;
+            template <typename TraitInner>
+            using Type = traited_c_enum<TagType, ConstInfo<TraitInner>>;
+
+            constexpr Type<inst::Utf8> CONSTANT_Utf8{1};
+            constexpr Type<inst::MF> CONSTANT_Fieldref{9};
+            constexpr Type<inst::MF> CONSTANT_Methodref{10};
+            constexpr Type<inst::MF> CONSTANT_InterfaceMethodref{11};
+            constexpr Type<inst::NameAndType> CONSTANT_NameAndType{12};
+            constexpr Type<inst::Dynamic> CONSTANT_InvokeDynamic{18};
+            constexpr Type<inst::MP> CONSTANT_Module{19};
+            constexpr Type<inst::MP> CONSTANT_Package{20};
+
+            using Traits = TraitedCEnumsTrait<>;
+
+            namespace LTag {
+                constexpr Type<inst::Primitive<java_ts::Int>> CONSTANT_Integer{3};
+                constexpr Type<inst::Primitive<java_ts::Float>> CONSTANT_Float{4};
+                constexpr Type<inst::Primitive<java_ts::Long>> CONSTANT_Long{5};
+                constexpr Type<inst::Primitive<java_ts::Double>> CONSTANT_Double{6};
+                constexpr Type<inst::Class> CONSTANT_Class{7};
+                constexpr Type<inst::String> CONSTANT_String{8};
+                constexpr Type<inst::MethodHandle> CONSTANT_MethodHandle{15};
+                constexpr Type<inst::MethodType> CONSTANT_MethodType{16};
+                constexpr Type<inst::Dynamic> CONSTANT_Dynamic{17};
+
+                using Traits = TraitedCEnumsTrait<CONSTANT_Integer, CONSTANT_Float, CONSTANT_Long, CONSTANT_Double, CONSTANT_Class, CONSTANT_String, CONSTANT_MethodHandle, CONSTANT_MethodType, CONSTANT_Dynamic>;
+            }
+        }
+    }*/
+
+    /*enum class Tag : uint8_t {
+        // l
+        CONSTANT_Integer = 3,
+        CONSTANT_Float = 4,
+        CONSTANT_Long = 5,
+        CONSTANT_Double = 6,
+        CONSTANT_Class = 7,
+        CONSTANT_String = 8,
+        CONSTANT_MethodHandle = 15,
+        CONSTANT_MethodType = 16,
+        CONSTANT_Dynamic = 17,
+
+        CONSTANT_Utf8 = 1,
+        CONSTANT_Fieldref = 9,
+        CONSTANT_Methodref = 10,
+        CONSTANT_InterfaceMethodref = 11,
+        CONSTANT_NameAndType = 12,
+        CONSTANT_InvokeDynamic = 18,
+        CONSTANT_Module = 19,
+        CONSTANT_Package = 20,
+    };*/
+
+
+
+    /*template <typename Type>
+    NODISCARD F_INLINE constexpr Type memcpy_create(uint8_t* src) noexcept {
+        Type ret;
+        std::memcpy(&ret, src, sizeof(Type));
+        return ret;
+    }*/
+
+    if constexpr ( requires { classNode.handle_version(version) } ) {
+                if constexpr ( requires { { classNode.handle_version(version) } -> std::same_as<uint32_t>; }) {
+                    if constexpr (useWrite) {
+                        version = classNode.handle_version(version);
+                    } else {
+                        classNode.handle_version(version);
+                    }
+                } else if constexpr ( requires { { classNode.handle_version(version) } -> std::same_as<void>; } ) {
+                    classNode.handle_version(version);
+                } else {
+                    static_assert("Invalid return type in method handle_version");
+                }
+            } else if constexpr ( requires { classNode.version } ) {
+                if constexpr ( requires { {classNode.version} -> std::same_as<uint32_t>; } ) {
+                    classNode.version = version;
+                } else {
+                    static_assert("Invalid type of field version");
+                }
+            }
+
+
+
+            /*if constexpr ( requires { { classNode.handle_version(version) } -> std::same_as<uint32_t>; } ) {
+                if constexpr (useWrite) {
+                    version = classNode.handle_version(version);
+                } else {
+                    classNode.handle_version(version);
+                }
+            } else if constexpr ( requires { { classNode.handle_version(version) } -> std::same_as<void>; } ) {
+                classNode.handle_version(version);
+            } else if constexpr ( requires { { classNode.version } -> std::same_as<uint32_t>; } ) {
+                classNode.version = version;
+            }*/
+
+    template <typename Type, bool useWrite>
+    void a(Type oldInst, auto classNode) {}
+
+    /*namespace full {
+            struct ParameterN {
+                std::string name;
+                opcodes::AccType access;
+            };
+
+            struct MethodN {
+                uint16_t maxStack, maxLocals;
+                insn::CList insns;
+                std::vector<std::string> exceptions;
+                std::vector<ParameterN> parameters;
+                std::string name, desc, signature, superName, sourceFile;
+                opcodes::AccType access;
+            };
+
+            struct ClassN {
+                std::vector<std::string> interfaces;
+                std::string name, signature, superName, sourceFile;
+                opcodes::AccType access;
+                std::vector<MethodN> fields;
+            };
+        }*/
+
+
+    /*struct RWFileData {
+        char* path;
+
+        template <typename Sym = uint8_t, bool ReturnWithSize = true, bool AddEmptySymbolInEnd = true>
+        NODISCARD inline auto read_file() const noexcept {
+            constexpr int seek_set = SEEK_SET;
+            constexpr int seek_end = SEEK_END;
+
+            FILE* file = fopen(path, "rb");
+            if (!file) {
+                if constexpr (ReturnWithSize) {
+                    return FileDataWithSize<Sym>{nullptr, 0};
+                } else {
+                    return FileData<Sym>{nullptr};
+                }
+            }
+
+            fseek(file, 0, seek_end);
+            const size_t size = ftell(file);
+
+            fseek(file, 0, seek_set);
+
+            size_t sizeWithEmptySymbol;
+            if constexpr (AddEmptySymbolInEnd) {
+                sizeWithEmptySymbol = size + 1;
+            } else {
+                sizeWithEmptySymbol = size;
+            }
+
+            const auto data = static_cast<Sym*>(malloc(sizeWithEmptySymbol));
+            fread(data, 1, size, file);
+
+            if constexpr (AddEmptySymbolInEnd) {
+                data[size] = '\0';
+            }
+
+            fclose(file);
+
+            if constexpr (ReturnWithSize) {
+                return FileDataWithSize<Sym>{data, size};
+            } else {
+                return FileData<Sym>{data};
+            }
+        }
+
+        template <typename Sym>
+        NODISCARD bool raw_write_file(FileDataWithSize<Sym> data) const noexcept {
+            FILE* file = fopen(path, "wb");
+            if (!file) return false;
+            fwrite(data, sizeof(Sym), data.size, file);
+            fclose(file);
+            return true;
+        }
+    };*/
+
+            /*NODISCARD constexpr Node* get_next_nearstnext_present_node_and_destruct_empty() noexcept {
+                auto* nextI = nextNode;
+                if (nextI) {
+                    bool changed = false;
+                    while (nextI && nextI->is_empty()) {
+                        changed = true;
+                        auto nextNextI = nextI->nextNode;
+                        delete nextI;
+                        nextI = nextNextI;
+                    }
+                    if (changed) {
+                        nextNode = nextI;
+                        if (nextI) {
+                            connect(this, nextI);
+                        }
+                    }
+                }
+                return nextI;
+            }*/
+    template <typename T>
+    constexpr bool useWriteConceptFunc() noexcept {
+        return STATIC_BOOL_FLAG_CHECKER_LAMBDA(useWrite, false).template operator()<T>();
+    }
+
+    template <typename T>
+    concept UseWriteConcept = useWriteConceptFunc<T>();
+
+
+
+        uint32_t version;
+        do {
+            auto timed = symPtr.template memcpy_get_rev<uint32_t>();
+            if (!timed) [[unlikely]] { return std::unexpected{ParseErr::INVALID}; };
+            version = *timed;
+        } while (0);
+        do {
+            if constexpr ( requires { classNode.handle_version(version); } ) {
+                using timed_t_0 = decltype((classNode.handle_version(version)));
+                static constexpr bool timed_b_1 = requires { { std::declval<timed_t_0>().jaac_convert_to_version() } -> std::same_as<uint32_t>; };
+
+                static constexpr bool timed_b_2 = requires { { classNode.handle_version(version) } -> std::same_as<uint32_t>; };
+                static constexpr bool timed_b_3 = requires {
+                    { classNode.handle_version(version) } -> std::same_as<void>;
+                };
+
+                static constexpr  bool timed_s = timed_b_1 || timed_b_2 || timed_b_3;
+
+                if constexpr (useWriteFlag) {
+                    if constexpr (timed_b_1) {
+                        version = classNode.handle_version(version).jaac_convert_to_version();
+                    } else if constexpr (timed_b_2) {
+                        version = classNode.handle_version(version);
+                    } else if constexpr (timed_b_3) {
+                        classNode.handle_version(version);
+                    }
+                } else if constexpr (timed_s) {
+                    classNode.handle_version(version);
+                } else {
+                    static_assert(timed_s, "Invalid return type in method name handle_version. Expected uint3_t");
+                }
+            } else if constexpr ( requires { classNode.version; } ) {
+                using timed_t_1 = decltype(classNode.version);
+
+                static constexpr bool timed_b_1 = std::same_as<timed_t_1, uint32_t>;
+                static constexpr bool timed_b_2 = requires { classNode.version = timed_t_1::jaac_convert_from_version(version); };
+                static constexpr bool timed_s = timed_b_1 || timed_b_2;
+
+                if constexpr (timed_b_1) {
+                    classNode.version = version;
+                } else if constexpr (timed_b_2) {
+                    classNode.version = timed_t_1::jaac_convert_from_version(version);
+                } else {
+                    static_assert(timed_s, "Invalid type of field version. Expected uint32_t");
+                }
+            }
+        } while (0);
+        if constexpr (useWriteFlag) {
+            auto version2 = std::byteswap(version);
+            outData.append_range(cstd::convert_to_span<uint8_t>(version2));
+        };
+
+        #include "cstd//macro.h"
+        #include <iostream>
+
+        import parser;
+        import nodes;
+        import reader;
+
+        struct ClassN {
+            uint32_t version{};
+        };
+
+        struct ClassN1 {
+            uint64_t version{};
+        };
+
+        struct ClassN2T1 {
+            uint32_t version;
+
+            static ClassN2T1 jaac_convert_from_version(const uint32_t version) {
+                return {version};
+            }
+
+            uint32_t jaac_convert_to_version() const {
+                return version;
+            }
+        };
+
+        struct ClassN2 {
+            ClassN2T1 version{};
+        };
+
+        struct ClassN3 {
+            uint32_t version{};
+            uint32_t handle_version(const uint32_t ver) {
+                return version = ver;
+            }
+        };
+
+        struct ClassN4 {
+            uint32_t version{};
+
+            void handle_version(const uint32_t ver) {
+                version = ver;
+            }
+        };
+
+        struct ClassN5 {
+            ClassN2T1 version{};
+
+            ClassN2T1 handle_version(const uint32_t ver) {
+                return version = {ver};
+            }
+        };
+
+        struct ClassN6 {
+            uint64_t handle_version(const uint32_t ver) {
+                return 0;
+            }
+        };
+
+        struct ClassN3S {
+            inline static uint32_t version;
+            static uint32_t handle_version(const uint32_t ver) {
+                return version = ver;
+            }
+        };
+
+        struct ClassN4S {
+            inline static uint32_t version;
+
+            static void handle_version(const uint32_t ver) {
+                version = ver;
+            }
+        };
+
+        struct ClassN5S {
+            inline static ClassN2T1 version;
+
+            static ClassN2T1 handle_version(const uint32_t ver) {
+                return version = {ver};
+            }
+        };
+
+        struct ClassN6S {
+            static uint64_t handle_version(const uint32_t ver) {
+                return 0;
+            }
+        };
+
+        int main() {
+            constexpr auto path = reader::PreRWFileData{"D:/you_p_only/cpp_elems/javaAsmAtCpp/test/test.class"};
+            auto result = parser::parse<ClassN>(path);
+            /*if (result) {
+                auto [node, flag] = *result;
+                int d = 0;
+            } else {
+                std::cerr << "Test failed: " << static_cast<uint32_t>(result.error()) << std::endl;
+            }*/
+
+            //parser::parse<ClassN1>(path);
+            //auto result6 = parser::parse<ClassN6>(path);
+            //auto result6s = parser::parse<ClassN6S>(path);
+
+            auto result2 = parser::parse<ClassN2>(path);
+            auto result3 = parser::parse<ClassN3>(path);
+            auto result4 = parser::parse<ClassN4>(path);
+            auto result5 = parser::parse<ClassN5>(path);
+            auto result3s = parser::parse<ClassN3S>(path);
+            auto result4s = parser::parse<ClassN4S>(path);
+            auto result5s = parser::parse<ClassN5S>(path);
+
+            int d = 0;
+        }
+
+
+    /*template <typename Instance>
+    struct ConstInfo {
+        Instance instance;
+        opcodes::TagIdEnum tagId;
+
+        ConstInfo(const opcodes::TagIdEnum tagId, Instance instance) noexcept : instance(instance), tagId(tagId) {
+        }
+
+        template <typename Spec>
+        NODISCARD static constexpr std::optional<ConstInfo> create(opcodes::TagIdEnum tagId,
+                                                                   parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
+            const std::optional<Instance> instance = Instance::create(dataPtr);
+            if (!instance)
+                return std::nullopt;
+            return {ConstInfo{*instance, tagId}};
+        }
+
+        template <typename Spec>
+        NODISCARD static constexpr bool check_and_move(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
+            return Instance::check_and_move(dataPtr);
+        }
+    };*/

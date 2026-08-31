@@ -1,12 +1,54 @@
 module;
 
 #include <cstdint>
-#include "macro.h"
+#include <variant>
+#include <array>
+
+#include "../cstd/macro.h"
+#include "opcodes_mcr.h"
 
 export module opcodes;
 
-export namespace opcodes {
-    namespace Acc {
+import simple_cstd;
+
+// https://docs.oracle.com/javase/specs//jvms/se26/html/jvms-4.html
+
+namespace opcodes {
+    export constexpr uint32_t magic = 0xCAFEBABE;
+    export constexpr auto magic_array = cstd::convert_to_array<uint8_t>(magic);
+
+    export namespace java_ts {
+        using Int = uint32_t;
+        using Long = uint64_t;
+        using Float = Int;
+        using Double = Long;
+
+        using IntDT = Void;
+        using LongDT = Void;
+        using FloatDT = float;
+        using DoubleDT = double;
+
+        DU_UNION_VIA_AL_DT(Int);
+        DU_UNION_VIA_AL_DT(Float);
+        DU_UNION_VIA_AL_DT(Double);
+        DU_UNION_VIA_AL_DT(Long);
+    }
+
+    export namespace Acc {
+        namespace Class {
+            using Type = uint16_t;
+
+            constexpr Type PUBLIC = 0x0001;
+            constexpr Type FINAL = 0x0010;
+            constexpr Type SUPER = 0x0020;
+            constexpr Type INTERFACE = 0x0200;
+            constexpr Type ABSTRACT = 0x0400;
+            constexpr Type SYNTHETIC = 0x1000;
+            constexpr Type ANNOTATION = 0x2000;
+            constexpr Type ENUM = 0x4000;
+            constexpr Type MODULE = 0x8000;
+        } // namespace Class
+
         using Type = uint32_t;
 
         constexpr Type PUBLIC = 0x0001; // class, field, method
@@ -34,9 +76,9 @@ export namespace opcodes {
         constexpr Type MODULE = 0x8000; // class
         constexpr Type RECORD = 0x10000; // class
         constexpr Type DEPRECATED = 0x20000; // class, field, method
-    }
+    } // namespace Acc
 
-    enum class NewArrType : std::int8_t {
+    export enum class NewArrType : std::int8_t {
         T_BOOLEAN = 4,
         T_CHAR = 5,
         T_FLOAT = 6,
@@ -47,7 +89,7 @@ export namespace opcodes {
         T_LONG = 11
     };
 
-    enum class LambdaHType : std::int8_t {
+    export enum class LambdaHType : std::int8_t {
         H_GETFIELD = 1,
         H_GETSTATIC = 2,
         H_PUTFIELD = 3,
@@ -59,7 +101,7 @@ export namespace opcodes {
         H_INVOKEINTERFACE = 9
     };
 
-    enum class Opc : std::uint8_t {
+    export enum class Opc : std::uint8_t {
         NOP = 0, // visitInsn
         ACONST_NULL = 1, // -
         ICONST_M1 = 2, // -
@@ -219,39 +261,61 @@ export namespace opcodes {
         IFNONNULL = 199 // -
     };
 
-    namespace Ver {
+    export namespace Ver {
         using Type = std::uint32_t;
         constexpr Type V_PREVIEW = 0xFFFF0000;
 
         enum class v : Type {
-            V1_1 = 3 << 16 | 45,
-            V1_2 = 0 << 16 | 46,
-            V1_3 = 0 << 16 | 47,
-            V1_4 = 0 << 16 | 48,
-            V1_5 = 0 << 16 | 49,
-            V1_6 = 0 << 16 | 50,
-            V1_7 = 0 << 16 | 51,
-            V1_8 = 0 << 16 | 52,
-            V9 = 0 << 16 | 53,
-            V10 = 0 << 16 | 54,
-            V11 = 0 << 16 | 55,
-            V12 = 0 << 16 | 56,
-            V13 = 0 << 16 | 57,
-            V14 = 0 << 16 | 58,
-            V15 = 0 << 16 | 59,
-            V16 = 0 << 16 | 60,
-            V17 = 0 << 16 | 61,
-            V18 = 0 << 16 | 62,
-            V19 = 0 << 16 | 63,
-            V20 = 0 << 16 | 64,
-            V21 = 0 << 16 | 65,
-            V22 = 0 << 16 | 66,
-            V23 = 0 << 16 | 67,
-            V24 = 0 << 16 | 68,
-            V25 = 0 << 16 | 69,
-            V26 = 0 << 16 | 70,
+            V1_1 = 3U << 16 | 45U,
+            V1_2 = 0U << 16 | 46U,
+            V1_3 = 0U << 16 | 47U,
+            V1_4 = 0U << 16 | 48U,
+            V1_5 = 0U << 16 | 49U,
+            V1_6 = 0U << 16 | 50U,
+            V1_7 = 0U << 16 | 51U,
+            V1_8 = 0U << 16 | 52U,
+            V9 = 0U << 16 | 53U,
+            V10 = 0U << 16 | 54U,
+            V11 = 0U << 16 | 55U,
+            V12 = 0U << 16 | 56U,
+            V13 = 0U << 16 | 57U,
+            V14 = 0U << 16 | 58U,
+            V15 = 0U << 16 | 59U,
+            V16 = 0U << 16 | 60U,
+            V17 = 0U << 16 | 61U,
+            V18 = 0U << 16 | 62U,
+            V19 = 0U << 16 | 63U,
+            V20 = 0U << 16 | 64U,
+            V21 = 0U << 16 | 65U,
+            V22 = 0U << 16 | 66U,
+            V23 = 0U << 16 | 67U,
+            V24 = 0U << 16 | 68U,
+            V25 = 0U << 16 | 69U,
+            V26 = 0U << 16 | 70U,
         };
-    }
+    } // namespace Ver
+
+    export using TagIdType = uint8_t;
+
+    export enum class TagIdEnum : TagIdType {
+        CONSTANT_Integer = 3,
+        CONSTANT_Float = 4,
+        CONSTANT_Long = 5,
+        CONSTANT_Double = 6,
+        CONSTANT_Class = 7,
+        CONSTANT_String = 8,
+        CONSTANT_MethodHandle = 15,
+        CONSTANT_MethodType = 16,
+        CONSTANT_Dynamic = 17,
+        CONSTANT_Utf8 = 1,
+        CONSTANT_Fieldref = 9,
+        CONSTANT_Methodref = 10,
+        CONSTANT_InterfaceMethodref = 11,
+        CONSTANT_NameAndType = 12,
+        CONSTANT_InvokeDynamic = 18,
+        CONSTANT_Module = 19,
+        CONSTANT_Package = 20
+    };
 
 #if 0
     enum class StackFrameTypes {
@@ -264,7 +328,8 @@ export namespace opcodes {
         UNINITIALIZED_THIS = Frame.ITEM_UNINITIALIZED_THIS,
     };
 #endif
-
-    using VerType = Ver::Type;
-    using AccType = Acc::Type;
-}
+    /*export {
+        using VerType = Ver::Type;
+        using AccType = Acc::Type;
+    }*/
+} // namespace opcodes

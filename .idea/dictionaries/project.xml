@@ -90,6 +90,7 @@
       <w>nearstnext</w>
       <w>newarray</w>
       <w>newinvokespecial</w>
+      <w>nstance</w>
       <w>offsetnearst</w>
       <w>putfield</w>
       <w>putstatic</w>
@@ -97,6 +98,7 @@
       <w>sastore</w>
       <w>sipush</w>
       <w>tableswitch</w>
+      <w>traited</w>
     </words>
   </dictionary>
 </component>
