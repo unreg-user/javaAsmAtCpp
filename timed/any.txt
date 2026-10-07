@@ -535,3 +535,536 @@ struct AbsInsnNodes {
             return Instance::check_and_move(dataPtr);
         }
     };*/
+                    if (result) {
+                        std::cout << "#" << std::to_string(i) << " = " << const_i::tag_to_str(tagId) << "\t\t\t\t"
+                                  << const_i::traits::variant_to_str(**result) << std::endl;
+                    }
+
+
+
+#define HANDLE(name, Type, oldInst, classNode, useWriteFlag) { \
+static constexpr bool timed_pre1 = requires { classNode.handle_##name(oldInst); }; \
+static_assert(timed_pre1 || !CHECK_METHOD_EXITS(classNode, handle_##name), "Invalid arg in method handle_"#name); \
+if constexpr (timed_pre1) { \
+    using timed_t_0 = decltype((classNode.handle_##name(oldInst))); \
+    static constexpr bool timed_b_1 = requires { { classNode.handle_##name(oldInst) } -> std::same_as<Type>; }; \
+    static constexpr bool timed_b_2 = requires { { classNode.handle_##name(oldInst) } -> std::same_as<void>; };\
+    static constexpr bool timed_b_3 = requires { { std::declval<timed_t_0>().jaac_convert_to_##name() } -> std::same_as<Type>; }; \
+    static constexpr bool timed_s = timed_b_1 || timed_b_2 || timed_b_3; \
+    if constexpr (useWriteFlag) { \
+        if constexpr (timed_b_1) { \
+            oldInst = classNode.handle_##name(oldInst); \
+        } else if constexpr (timed_b_2) { \
+            classNode.handle_##name(oldInst); \
+        } else if constexpr (timed_b_3) { \
+            oldInst = classNode.handle_##name(oldInst).jaac_convert_to_##name(); \
+        } \
+    } else if constexpr (timed_s) { \
+        classNode.handle_##name(oldInst); \
+    } else { \
+        static_assert(timed_s, "Invalid return type in method handle_"#name". Flat expected "#Type); \
+    } \
+} else if constexpr ( CHECK_FIELD_EXITS(classNode, name) ) { \
+    using timed_t_0 = decltype(classNode.name); \
+    static constexpr bool timed_b_1 = std::same_as<timed_t_0, uint32_t>; \
+    static constexpr bool timed_b_2 = requires { classNode.name = timed_t_0::jaac_convert_from_##name(oldInst); }; \
+    static constexpr bool timed_s = timed_b_1 || timed_b_2; \
+    if constexpr (timed_b_1) { \
+        classNode.name = oldInst; \
+    } else if constexpr (timed_b_2) { \
+        classNode.name = timed_t_0::jaac_convert_from_##name(oldInst); \
+    } else { \
+        static_assert(timed_s, "Invalid type of field "#name". Flat expected "#Type); \
+    } \
+} \
+}
+
+#define HANDLE_MU_LAMBDA(name, classNode, useWriteFlag, ...) \
+     [&] <typename Callable> (Callable&& callable) noexcept { \
+         static constexpr bool utimed_b_1 = requires { classNode.m_handle_##name(__VA_ARGS__); }; \
+         static constexpr bool utimed_b_2 = requires { classNode.m_handle_##name({__VA_ARGS__}); };\
+         static constexpr bool utimed_s = utimed_b_1 || utimed_b_2 || !CHECK_METHOD_EXITS(classNode, m_handle_##name); \
+         if constexpr ( utimed_b_1 ) { \
+             auto timed = [&classNode] (auto... args) { \
+                static const auto timed_l_1 = [] (auto value) { auto [__VA_ARGS__] = value; }; \
+                static constexpr bool timed_b_1 = requires { timed_l_1(classNode.m_handle_##name(args...)); }; \
+                static constexpr bool timed_b_2 = requires { { classNode.m_handle_##name(args...) } -> std::same_as<void>; };\
+                static constexpr bool timed_b_3 = requires { timed_l_1(classNode.m_handle_##name(args...).jaac_convert_to_m_##name()); }; \
+                static constexpr bool timed_s = timed_b_1 || timed_b_2 || timed_b_3; \
+                if constexpr (useWriteFlag) { \
+                    if constexpr (timed_b_1) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name(args...); \
+                        return std::tuple(__VA_ARGS__); \
+                    } else if constexpr (timed_b_2) { \
+                        classNode.m_handle_##name(args...); \
+                        return false; \
+                    } else if constexpr (timed_b_3) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name(args...).jaac_convert_to_m_##name(); \
+                        return std::tuple(__VA_ARGS__); \
+                    } \
+                } else if constexpr (timed_s) { \
+                    classNode.m_handle_##name(args...); \
+                       return false; \
+                } else { \
+                    static_assert(timed_s, "Invalid return type in method m_handle_"#name); \
+                }\
+             }(__VA_ARGS__);    \
+             if constexpr (!std::same_as<decltype(timed), bool>) { \
+                std::tie(__VA_ARGS__) = timed; \
+             } \
+         } else if constexpr ( utimed_b_2 ) { \
+             auto timed = [&classNode] (auto... args) { \
+                static const auto timed_l_1 = [] (auto value) { auto [__VA_ARGS__] = value; }; \
+                static constexpr bool timed_b_1 = requires { timed_l_1(classNode.m_handle_##name({args...})); }; \
+                static constexpr bool timed_b_2 = requires { { classNode.m_handle_##name({args...}) } -> std::same_as<void>; };\
+                static constexpr bool timed_b_3 = requires { timed_l_1(classNode.m_handle_##name({args...}).jaac_convert_to_m_##name()); }; \
+                static constexpr bool timed_s = timed_b_1 || timed_b_2 || timed_b_3; \
+                if constexpr (useWriteFlag) { \
+                    if constexpr (timed_b_1) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name({args...}); \
+                        return std::tuple(__VA_ARGS__); \
+                    } else if constexpr (timed_b_2) { \
+                        classNode.m_handle_##name({args...}); \
+                        return false; \
+                    } else if constexpr (timed_b_3) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name({args...}).jaac_convert_to_m_##name(); \
+                        return std::tuple(__VA_ARGS__); \
+                    } \
+                } else if constexpr (timed_s) { \
+                    classNode.m_handle_##name({args...}); \
+                    return false; \
+                } else { \
+                    static_assert(timed_s, "Invalid return type in method m_handle_"#name); \
+                }\
+             }(__VA_ARGS__);    \
+             if constexpr (!std::same_as<decltype(timed), bool>) { \
+                std::tie(__VA_ARGS__) = timed; \
+             } \
+         } else { \
+            static_assert(utimed_s, "Invalid args in method m_handle_"#name); \
+            callable(); \
+         }\
+     }
+
+
+    template <class T, size_t size>
+    struct static_vector : std::array<T, size> {
+        size_t i;
+
+        constexpr void push_back(const T& value) noexcept {
+
+        }
+    };
+
+                    /*template <typename EmptyType = void, typename OrElseCCFunc = ErrCCFunc>
+                    using Combine = Op<TypesTraits<typename Get1Of2<Types2>::Result...>>;*/
+        //using vec_var = f_types::WApply<std::vector, std::variant>;
+
+
+        template <KN Container>
+        using ApplySign = dstd::call::RewrapFuncSignature<Container, FuncSign>;
+
+        /*struct vec_var_e {
+            vec_var vec;
+
+            template <typename T>
+            void push_back(T& arg) {
+                std::visit([&] (auto& v) { v.push_back(arg); }, vec);
+            }
+        };*/
+
+    /*template <typename Ret, typename... Args>
+    struct var_call {
+        Ret operator()(this auto&& self, Args... args) {
+            return std::visit([] (auto v) { return v(cstd::forward_cpy<Args>(args)...); }, self);
+        }
+    };*/
+
+    template <typename FuncSign>
+    struct dif_stack_funcs {
+        using sign_trait = dstd::call::CallableTraits<FuncSign>;
+        using sign_s_trait = sign_trait::ArgsTraitsT::Prepend<sign_trait::RetT>;
+
+        using stack_f = stack_func<FuncSign>;
+        using heap_f = heap_func<FuncSign>;
+        using ncap_f = FuncSign*;
+
+        using f_types = dstd::args::TypesTraits<stack_f, heap_f, ncap_f>;
+
+        struct var : f_types::Wrap<std::variant>, sign_s_trait::Wrap<var_call> {
+        };
+
+        template <typename Callable>
+        var to_var_stack(Callable& callable) {
+            if constexpr (dstd::call::is_ncap<Callable>>) {
+                return var{static_cast<ncap_f>(ret)};
+            } else {
+                return var{stack_f{callable}};
+            }
+        }
+
+        template <typename Callable>
+        var to_var_heap(Callable&& callable) {
+            if constexpr (dstd::call::is_ncap<std::remove_cvref_t<Callable>>) {
+                return var{static_cast<ncap_f>(ret)};
+            } else {
+                return var{heap_f{callable}};
+            }
+        }
+
+    private:
+        template <bool is_void = true, typename... Callables>
+        static constexpr var make_ncap_pre_parallel = sign_trait::ArgsTraitsT::apply_l_args([] <template Args...> (Args... args) {
+                if constexpr (is_void) {
+                    (Callables{}(cstd::forward_cpy<Args>(captured_args)...), ...);
+                } else {
+                    return std::tuple{ Callables{}(cstd::forward_cpy<Args>(captured_args)...)... };
+                }
+            });
+
+        template <bool is_void = true, typename... Callables>
+        static constexpr var make_ncap_parallel = var{ncap_f{make_ncap_pre_parallel<is_void, Callables...>}};
+
+    public:
+        template <bool is_void = true, typename... Callables>
+        constexpr var make_stack_pre_parallel(Callables&... callables) {
+            if constexpr (dstd::call::is_ncap<Callables>> && ...) {
+                return make_ncap_parallel<is_void, Callables...>;
+            } else {
+                return var{stack_f{sign_trait::ArgsTraitsT::apply_l_args([&callables] <template Args...> (Args... args) {
+                    if constexpr (is_void) {
+                        (callables(cstd::forward_cpy<Args>(captured_args)...), ...);
+                    } else {
+                        return std::tuple{ callables(cstd::forward_cpy<Args>(captured_args)...)... };
+                    }
+                })}};
+            }
+        }
+
+        template <typename... Callables>
+        auto make_heap_paralel(Callables&&... callables) {
+            if constexpr (dstd::call::is_ncap<Callables>> && ...) {
+                return make_ncap_parallel<is_void, Callables...>;
+            } else {
+                return var{heap_f{sign_trait::ArgsTraitsT::apply_l_args([] <template Args...> (Args... args) {
+                    if constexpr (is_void) {
+                        (Callables{}(cstd::forward_cpy<Args>(captured_args)...), ...);
+                    } else {
+                        return std::tuple{ Callables{}(cstd::forward_cpy<Args>(captured_args)...)... };
+                    }
+                })}};
+            }
+        }
+    };
+
+    export template <typename DT>
+    NODISCARD constexpr F_INLINE auto next_if_nb(DT&& callable1, auto&& callable2) noexcept {
+        using T = std::remove_cvref_t<DT>;
+        if constexpr (!std::same_as<T, bool>) {
+            return T [=] <template Args...> (Args... args) { callable2(callable1(forward_cpy<Args>(args)...)) };
+        } else {
+            return false;
+        }
+    }
+
+
+#define HANDLE_MU_LAMBDA(name, classNode, outDataLs, useWriteFlag ...) \
+     [&] <typename Callable> (Callable&& callable) noexcept { \
+         T_CO_FLAG utimed_b_1 = requires { classNode.m_handle_##name(__VA_ARGS__); }; \
+         T_CO_FLAG utimed_b_2 = requires { classNode.m_handle_##name({__VA_ARGS__}); };\
+         T_CO_FLAG utimed_s = utimed_b_1 || utimed_b_2 || !CHECK_METHOD_EXITS(classNode, m_handle_##name); \
+         if constexpr ( utimed_b_1 ) { \
+             auto timed = [&classNode] (auto... args) { \
+                static const auto timed_l_1 = [] (auto value) { auto [__VA_ARGS__] = value; }; \
+                T_CO_FLAG timed_b_1 = requires { timed_l_1(classNode.m_handle_##name(args...)); }; \
+                T_CO_FLAG timed_b_2 = requires { { classNode.m_handle_##name(args...) } -> std::same_as<void>; };\
+                T_CO_FLAG timed_b_3 = requires { timed_l_1(classNode.m_handle_##name(args...).jaac_convert_to_m_##name()); }; \
+                T_CO_FLAG timed_s = timed_b_1 || timed_b_2 || timed_b_3; \
+                if constexpr (useWriteFlag) { \
+                    if constexpr (timed_b_1) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name(args...); \
+                        return std::tuple(__VA_ARGS__); \
+                    } else if constexpr (timed_b_2) { \
+                        classNode.m_handle_##name(args...); \
+                        return false; \
+                    } else if constexpr (timed_b_3) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name(args...).jaac_convert_to_m_##name(); \
+                        return std::tuple(__VA_ARGS__); \
+                    } \
+                } else if constexpr (timed_s) { \
+                    classNode.m_handle_##name(args...); \
+                       return false; \
+                } else { \
+                    static_assert(timed_s, "Invalid return type in method m_handle_"#name); \
+                }\
+             }(__VA_ARGS__);    \
+             if constexpr (!std::same_as<decltype(timed), bool>) { \
+                std::tie(__VA_ARGS__) = timed; \
+             } \
+         } else if constexpr ( utimed_b_2 ) { \
+             auto timed = [&classNode] (auto... args) { \
+                static const auto timed_l_1 = [] (auto value) { auto [__VA_ARGS__] = value; }; \
+                static constexpr bool timed_b_1 = requires { timed_l_1(classNode.m_handle_##name({args...})); }; \
+                static constexpr bool timed_b_2 = requires { { classNode.m_handle_##name({args...}) } -> std::same_as<void>; };\
+                static constexpr bool timed_b_3 = requires { timed_l_1(classNode.m_handle_##name({args...}).jaac_convert_to_m_##name()); }; \
+                static constexpr bool timed_s = timed_b_1 || timed_b_2 || timed_b_3; \
+                if constexpr (useWriteFlag) { \
+                    if constexpr (timed_b_1) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name({args...}); \
+                        return std::tuple(__VA_ARGS__); \
+                    } else if constexpr (timed_b_2) { \
+                        classNode.m_handle_##name({args...}); \
+                        return false; \
+                    } else if constexpr (timed_b_3) { \
+                        auto [__VA_ARGS__] = classNode.m_handle_##name({args...}).jaac_convert_to_m_##name(); \
+                        return std::tuple(__VA_ARGS__); \
+                    } \
+                } else if constexpr (timed_s) { \
+                    classNode.m_handle_##name({args...}); \
+                    return false; \
+                } else { \
+                    static_assert(timed_s, "Invalid return type in method m_handle_"#name); \
+                }\
+             }(__VA_ARGS__);    \
+             if constexpr (!std::same_as<decltype(timed), bool>) { \
+                std::tie(__VA_ARGS__) = timed; \
+             } \
+         } else { \
+            static_assert(utimed_s, "Invalid args in method m_handle_"#name); \
+            callable(); \
+         }\
+     }
+            return DEF_HANDLE_MU(version, minor_version, major_version)([&] {
+            });
+
+
+            void jaac_final_handle() {
+                for (int i = 1; i < this->size(); ++i) {
+                    const auto j = (*this)[i];
+
+                    std::cout << "#" << std::to_string(i) << " = " /*<< const_i::tag_to_str(tagId)*/ << "\t\t\t\t" << const_i::traits::variant_to_str(j) << std::endl;
+                }
+            }
+
+        {
+            if constexpr (handleWrittenCpoolFlag != HandleMode::NONE) {
+                classNode.cpool.jaac_start_handle(classNode);
+            }
+
+
+            if constexpr (handleWrittenCpoolFlag != HandleMode::NONE) {
+                classNode.cpool.jaac_postcomplete_handle(classNode);
+            }
+        }
+        auto* cpool_last = readPtr.i - 1;
+        OPT_ARRAY_HANDLE_INIT(cpool, Cpool, cpool, CPoolSizeT, "JaacCpoolCont",
+                              JaacCpoolCont<decltype(classNode.cpool), ClassNT>);
+
+    template <typename T>
+    concept FieldInfo = requires (T t, FieldInfo commonData) {
+        T(commonData);
+        { t.jaac_get_common_data() } -> std::same_as<ComFieldInfo>;
+    } && CHECK_FIELD_EXISTS_T(T, attrs);
+
+    EL_CONC_WRAPPER(FieldInfo);
+
+
+    /** requires JaacCollection with ElementTConceptSt::Value elements */
+    template <typename T, typename CNT, typename ElementTConceptSt>
+    concept JaacCollectionViaElConceptSt = requires (T t, size_t iSize) { requires ElementTConceptSt::template Value<decltype(t.jaac_at(iSize))> && JaacCollection<T, CNT, decltype(t.jaac_at(iSize))>; };
+
+
+
+    using WritePtrDefaultFlagsStruct = ReadPtrDefaultFlagsStruct;
+
+    template <typename Sym, typename FlagsStruct = WritePtrDefaultFlagsStruct>
+    [[deprecated]] struct WritePtr {
+        Sym* i;
+        Sym* last;
+
+        explicit WritePtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size) {
+        }
+
+        explicit WritePtr(const WritePtr& other) noexcept : i(other.i), last(other.last) {
+        }
+
+    private:
+        WritePtr(Sym* i, Sym* last) noexcept : i(i), last(last) {
+        }
+
+    public:
+        WritePtr cpyWithSizeSymbols(const size_t size) {
+            return {i, i + size};
+        }
+
+        WritePtr cpyWithSize(const size_t bytes) {
+            assert(bytes % sizeof(Sym) == 0);
+            return cpyWithSizeSymbols(bytes / sizeof(Sym));
+        }
+
+        template <typename Type>
+        NODISCARD F_INLINE bool deser_via_func(Type&& from, auto&& callable) noexcept {
+            static_assert(sizeof(Type) % sizeof(Sym) == 0, "cannot containing in symbols");
+            static constexpr auto typeS = sizeof(Type) / sizeof(Sym);
+
+            if constexpr (FlagsStruct::CheckMemorySize) {
+                if (!(i + typeS <= last)) [[unlikely]] {
+                    return false;
+                }
+            }
+
+            auto from2 = callable(from);
+            std::memcpy(i, &from2, typeS);
+            i += typeS;
+            return true;
+        }
+
+        template <typename Type>
+        NODISCARD F_INLINE bool deser(Type&& from) noexcept {
+            return deser_via_func(from, cstd::identify_lambda);
+        }
+
+        template <typename Type>
+        NODISCARD F_INLINE bool deser_rev(Type&& from) noexcept {
+            return deser_via_func(from, cstd::byteswap_v_func);
+        }
+    };
+
+
+
+        /*
+        template <typename ElType, size_t size>
+        NODISCARD F_INLINE void deser_span_via_func(std::span<const ElType, size>&& from, auto&& callable) noexcept {
+            if constexpr (size == std::dynamic_extent) {
+                auto handled = new ElType[from.size()];
+                for (size_t i = 0; i < size; i++) handled[i] = callable(from[i]);
+                deser(handled);
+                delete[] handled;
+            } else {
+                ElType handled[size];
+                for (size_t i = 0; i < size; i++) handled[i] = callable(from[i]);
+                deser(handled);
+            }
+        }*/
+
+
+
+        template <typename ElType, size_t size>
+        NODISCARD F_INLINE void deser_span(std::span<const ElType, size>&& from) noexcept {
+            if constexpr (size == std::dynamic_extent) {
+                vec.append_range(cstd::iterate_span_by_syms<Sym, const ElType, size>{from});
+            } else {
+                using ArrType = ElType[size];
+                deser(*reinterpret_cast<ArrType*>(from.data()));
+            }
+        }
+
+    template <typename ElType, typename Sym, size_t span_size>
+    struct span_to_syms_iterator {
+        static_assert(sizeof(ElType) % sizeof(Sym) == 0, "Invalid types size alignment");
+
+        static constexpr size_t SymsPerEl = sizeof(ElType) / sizeof(Sym);
+        using ElTypeAsSymArr = Sym[SymsPerEl];
+
+        using iterator_category = std::random_access_iterator_tag;
+        using iterator_concept = std::random_access_iterator_tag;
+        using value_type = Sym;
+        using difference_type = std::ptrdiff_t;
+        using pointer = Sym*;
+        using reference = Sym&;
+
+        std::span<ElType, span_size> obj;
+        size_t i;
+
+        NODISCARD decltype(auto) operator*(this auto&& self) noexcept {
+            size_t el_idx = self.i / SymsPerEl;
+            size_t sym_idx = self.i % SymsPerEl;
+
+            auto* arr_ptr = reinterpret_cast<ElTypeAsSymArr*>(&self.obj[el_idx]);
+            return (*arr_ptr)[sym_idx];
+        }
+
+        NODISCARD decltype(auto) operator->(this auto&& self) noexcept {
+            return &*self;
+        }
+
+        span_to_syms_iterator& operator++() noexcept {
+            i++;
+            return *this;
+        }
+
+        span_to_syms_iterator operator++(int) noexcept {
+            span_to_syms_iterator old = *this;
+            i++;
+            return old;
+        }
+
+        span_to_syms_iterator& operator--() noexcept {
+            i--;
+            return *this;
+        }
+
+        span_to_syms_iterator operator--(int) noexcept {
+            span_to_syms_iterator old = *this;
+            i--;
+            return old;
+        }
+
+        span_to_syms_iterator& operator+=(const difference_type n) noexcept {
+            i += n;
+            return *this;
+        }
+
+        span_to_syms_iterator& operator-=(const difference_type n) noexcept {
+            i -= n;
+            return *this;
+        }
+
+        NODISCARD friend span_to_syms_iterator operator+(span_to_syms_iterator it, difference_type n) noexcept {
+            it += n;
+            return it;
+        }
+
+        NODISCARD friend span_to_syms_iterator operator+(difference_type n, span_to_syms_iterator it) noexcept {
+            it += n;
+            return it;
+        }
+
+        NODISCARD friend span_to_syms_iterator operator-(span_to_syms_iterator it, difference_type n) noexcept {
+            it -= n;
+            return it;
+        }
+
+        NODISCARD friend difference_type operator-(const span_to_syms_iterator& a,
+                                                   const span_to_syms_iterator& b) noexcept {
+            return static_cast<difference_type>(a.i) - static_cast<difference_type>(b.i);
+        }
+
+        NODISCARD decltype(auto) operator[](this auto&& self, difference_type n) const noexcept {
+            return *(self + n);
+        }
+
+        NODISCARD auto operator<=>(const span_to_syms_iterator& other) const noexcept {
+            return i <=> other.i;
+        }
+
+        NODISCARD bool operator==(const span_to_syms_iterator& other) const noexcept {
+            return i == other.i;
+        }
+    };
+
+    template <typename Sym, typename ElType, size_t span_size>
+    struct iterate_span_by_syms {
+        static_assert(sizeof(ElType) % sizeof(Sym) == 0, "Invalid types size alignment");
+        std::span<ElType, span_size> t;
+
+        static constexpr size_t SymsPerEl = sizeof(ElType) / sizeof(Sym);
+
+        decltype(auto) begin(this auto&& self) noexcept {
+            return span_to_syms_iterator<ElType, Sym, span_size>{self.t, 0};
+        }
+
+        decltype(auto) end(this auto&& self) noexcept {
+            return span_to_syms_iterator<ElType, Sym, span_size>{self.t, SymsPerEl};
+        }
+    };

@@ -1,11 +1,21 @@
 module;
 
 #include <concepts>
+#include <functional>
+
 #include "macro.h"
 
 export module dstd;
 
 namespace dstd {
+    export template <typename T>
+    struct COMPL_CRASH_WITH_LOG_TYPE;
+
+    export namespace call {
+        template <typename T>
+        constexpr bool is_ncap = std::is_empty_v<T>;
+    }
+
     // NOLINT(*-concat-nested-namespaces)
     namespace args {
         export {
@@ -42,22 +52,35 @@ namespace dstd {
                 template <size_t index>
                 using GetTypeAt = Types...[index];
 
-                template <K1 Applicator = IdentifyApplicator, KN Wrapper = TypesTraits>
-                using Apply = Wrapper<Applicator<Types>...>;
+                template <K1 Applicator, KN Wrapper>
+                using WApply = Wrapper<Applicator<Types>...>;
+
+                template <K1 Applicator = IdentifyApplicator>
+                using Apply = TypesTraits<Applicator<Types>...>;
+
+                template <typename... Types2>
+                using Append = TypesTraits<Types..., Types2...>;
+
+                template <typename... Types2>
+                using Prepend = TypesTraits<Types2..., Types...>;
 
                 template <KN Wrapper>
                 using Wrap = Wrapper<Types...>;
 
-                template <typename>
-                struct Op {
-                    static_assert("not type trait");
+                template <typename... Types2>
+                struct AsOp {
+                    using Conc = TypesTraits<Types..., Types2...>;
                 };
 
-                /*template <typename... Types2>
-                struct Op<TypesTraits<Types2...>> {
-                    template <typename EmptyType = void, typename OrElseCCFunc = ErrCCFunc>
-                    using Combine = Op<TypesTraits<typename Get1Of2<Types2>::Result...>>;
-                };*/
+                template <typename DCallable>
+                constexpr auto apply_l_args(DCallable&& callable) {
+                    using Callable = std::remove_cvref_t<DCallable>;
+                    if constexpr (call::is_ncap<Callable>) {
+                        return [] (Types... args) { return Callable{}(args...); };
+                    } else {
+                        return [=] (Types... args) { return callable(args...); };
+                    }
+                }
             };
 
             template <typename Instance>
@@ -181,12 +204,24 @@ namespace dstd {
         concept CallableConARet = requires(Func&& func, Args&&... args) { FORWARD(func)(FORWARD(args)...); };
 
         template <typename T, typename = void>
-        struct CallableTraits;
+        struct CallableTraits {
+            static_assert("not a function");
+        };
+
+        template <typename Ret>
+        struct ReturnTraits {
+            GENERIC_ALIAS(Ret);
+
+            template <typename... Args>
+            using SignatureWith = Ret(Args...);
+        };
 
         template <typename Ret, typename ArgsTraits>
         struct UCallableTraits {
             GENERIC_ALIAS(Ret);
             GENERIC_ALIAS(ArgsTraits);
+
+            using Signature = ArgsTraits::template Wrap<ReturnTraits<Ret>::template SignatureWith>;
         };
 
         template <typename Ret, typename... Args>
@@ -209,6 +244,36 @@ namespace dstd {
             : CallableTraits<decltype(&Callable::operator())> {};
 
         template <typename Callable>
-        using MakeCallableTraits = CallableTraits<std::decay_t<Callable>>;
+        using MakeCallableTraits = CallableTraits<std::remove_cvref_t<Callable>>;
+
+        template <typename Callable>
+        constexpr bool isCallable = requires { typename CallableTraits<Callable>; };
+
+        template <KN, typename>
+        struct RewrapFuncSignatureFromFuncClass {
+            // ReSharper disable once CppStaticAssertFailure
+            static_assert(false, "not a function");
+        };
+
+        template <KN Container, typename Ret, typename... Args>
+        struct RewrapFuncSignatureFromFuncClass<Container, std::_Func_class<Ret, Args...>> {
+            using Get = Container<Ret, Args...>;
+        };
+
+        template <KN Container, typename FuncSign>
+        using RewrapFuncSignature = RewrapFuncSignatureFromFuncClass<Container, typename std::_Get_function_impl<FuncSign>::type>::Get;
     } // namespace call
+
+    template <KN Base>
+    struct ExtendsTraits {
+        template <typename>
+        struct Get {
+            static_assert(requires { false; }, "not extends");
+        };
+
+        template <typename... Signature>
+        struct Get<Base<Signature...>> {
+            using SigT = args::TypesTraits<Signature...>;
+        };
+    };
 } // namespace dstd

@@ -1,6 +1,7 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>Ifaces</w>
       <w>Insn</w>
       <w>Prevnearst</w>
       <w>aaload</w>
@@ -92,6 +93,7 @@
       <w>newinvokespecial</w>
       <w>nstance</w>
       <w>offsetnearst</w>
+      <w>postcomplete</w>
       <w>putfield</w>
       <w>putstatic</w>
       <w>saload</w>

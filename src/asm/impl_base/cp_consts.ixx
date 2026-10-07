@@ -6,8 +6,8 @@ module;
 #include <string>
 
 #include <iostream>
-#include "../cstd/macro.h"
-#include "const_i_mcr.h"
+#include "../../cstd/macro.h"
+#include "cp_consts_mcr.h"
 
 export module const_i;
 
@@ -17,52 +17,47 @@ import opcodes;
 import parser_utils;
 import dstd;
 import cstd_variant;
+import read_utils;
 
-export namespace const_i {
-    using SizeT = uint16_t;
-
+export namespace cp_consts {
+    using SizeT = parser::CPoolSizeT;
     namespace inst {
-        namespace utils {
-            template <typename Self, typename... Args, typename Spec>
-            NODISCARD std::optional<Self> create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                return std::make_optional(Self{dataPtr.template memcpy_get_rev<Args>()...});
-            }
-        } // namespace utils
-
         template <typename PrType>
         struct AbsPrimitive {
             PrType value;
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return std::to_string(static_cast<cstd::GetMinNumStrUType<PrType>>(value));
             }
 
-        protected:
-            DEF_ABS_METHODS(AbsPrimitive)
+            DEF_ABS_METHODS_PACK(AbsPrimitive, value)
         };
 
         struct Class {
             SizeT classIdx;
+            DEF_TAG_FLAG(CONSTANT_Class)
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return "#" + std::to_string(classIdx);
             }
 
-            DEF_METHODS(Class)
+            DEF_METHODS(Class, classIdx)
         };
 
         struct AbsMF {
             SizeT classIdx;
             SizeT nameAndTypeIdx;
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return "#" + std::to_string(classIdx) + ".#" + std::to_string(nameAndTypeIdx);
             }
 
+            DEF_DESER(classIdx, nameAndTypeIdx)
+
         protected:
-            template <typename Spec>
-            NODISCARD static std::optional<AbsMF> abs_create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                return utils::create<AbsMF, decltype(classIdx), decltype(nameAndTypeIdx)>(dataPtr);
+            template <typename SpecR>
+            NODISCARD static std::optional<AbsMF> abs_parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                return reader::utils::parse_rev<AbsMF, decltype(classIdx), decltype(nameAndTypeIdx)>(dataPtr);
             }
 
             DEF_ABS_CHECK_AND_MOVE(AbsMF)
@@ -70,110 +65,154 @@ export namespace const_i {
 
         struct String {
             SizeT stringIdx;
+            DEF_TAG_FLAG(CONSTANT_String)
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return "#" + std::to_string(stringIdx);
             }
 
-            DEF_METHODS(String)
+            DEF_METHODS(String, stringIdx)
         };
 
         struct AbsMP {
             SizeT nameIdx;
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return "#" + std::to_string(nameIdx);
             }
 
-        protected:
-            DEF_ABS_METHODS(AbsMP)
+            DEF_ABS_METHODS_PACK(AbsMP, nameIdx)
         };
 
         struct MethodHandle {
             uint16_t refIdx;
             uint8_t refKind;
+            DEF_TAG_FLAG(CONSTANT_MethodHandle)
 
-            NODISCARD static std::string to_str() noexcept {
-                return "#" + std::to_string(nameIdx);
+            NODISCARD std::string to_str() const noexcept {
+                return std::to_string(refKind) + ":#" + std::to_string(refIdx);
             }
 
-            template <typename Spec>
-            NODISCARD static constexpr std::optional<MethodHandle>
-            create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                const auto refKind = dataPtr.template memcpy_get_rev<uint8_t>();
-                const auto refIdx = dataPtr.template memcpy_get_rev<uint16_t>();
-                if (!refIdx)
+            template <typename SpecR>
+            NODISCARD static constexpr std::optional<MethodHandle> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                const auto refKind = dataPtr.template parse_rev<uint8_t>();
+                const auto refIdx = dataPtr.template parse_rev<uint16_t>();
+                if (!(refKind && refIdx)) [[unlikely]]
                     return std::nullopt;
-                return {MethodHandle{*refIdx, *refKind}};
+                return {MethodHandle{.refIdx = *refIdx, .refKind = *refKind}};
             }
 
-            DEF_CHECK_AND_MOVE(MethodHandle)
+            template <typename SpecR>
+            NODISCARD static constexpr bool check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                return reader::utils::check_and_move<decltype(refIdx), decltype(refKind)>(dataPtr);;
+            }
+
+            DEF_DESER(refKind, refIdx)
         };
 
         struct NameAndType {
             SizeT nameIdx, descIdx;
+            DEF_TAG_FLAG(CONSTANT_NameAndType)
 
-            NODISCARD static std::string to_str() noexcept {
+            NODISCARD std::string to_str() const noexcept {
                 return "#" + std::to_string(nameIdx) + ":#" + std::to_string(descIdx);
             }
 
-            template <typename Spec>
-            NODISCARD static std::optional<NameAndType> create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                return utils::create<NameAndType, decltype(nameIdx), decltype(descIdx)>(dataPtr);
+            template <typename SpecR>
+            NODISCARD static std::optional<NameAndType> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                return reader::utils::parse_rev<NameAndType, decltype(nameIdx), decltype(descIdx)>(dataPtr);
             }
 
+            DEF_DESER(nameIdx, descIdx)
             DEF_CHECK_AND_MOVE(NameAndType)
         };
 
         struct MethodType {
             SizeT descIdx;
+            DEF_TAG_FLAG(CONSTANT_MethodType)
 
-            NODISCARD static std::string to_str() noexcept {
-                return "#" std::to_string(descIdx);
+            NODISCARD std::string to_str() const noexcept {
+                return "#" + std::to_string(descIdx);
             }
 
-            DEF_METHODS(MethodType)
+            DEF_METHODS(MethodType, descIdx)
         };
 
         struct AbsDynamic {
             SizeT bootstrapMethodAttrIdx, nameAndTypeIdx;
 
-            template <typename Spec>
-            NODISCARD static std::optional<AbsDynamic> create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                return utils::create<AbsDynamic, decltype(bootstrapMethodAttrIdx), decltype(nameAndTypeIdx)>(dataPtr);
+            NODISCARD std::string to_str() const noexcept {
+                return "#" + std::to_string(bootstrapMethodAttrIdx) + ":#" + std::to_string(nameAndTypeIdx);
             }
 
-            DEF_CHECK_AND_MOVE(AbsDynamic)
+            DEF_DESER(bootstrapMethodAttrIdx, nameAndTypeIdx)
+
+        protected:
+            template <typename SpecR>
+            NODISCARD static std::optional<AbsDynamic> abs_parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                return reader::utils::parse_rev<AbsDynamic, decltype(bootstrapMethodAttrIdx), decltype(nameAndTypeIdx)>(dataPtr);
+            }
+
+            DEF_ABS_CHECK_AND_MOVE(AbsDynamic)
         };
 
+        template <bool shouldFree = false>
         struct Utf8 {
-            using Utf8SizeT = uint16_t;
-
             std::span<uint8_t> utf8Info;
-            bool shouldFree;
+            using Utf8SizeT = uint16_t;
+            DEF_TAG_FLAG(CONSTANT_Utf8)
 
-            template <typename Spec>
-            NODISCARD static constexpr std::optional<Utf8> create(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
-                const auto lengthOpt =
-                        dataPtr.template memcpy_get_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
-                if (!lengthOpt)
-                    return std::nullopt;
-
-                uint8_t* strStartPtr = dataPtr.getI();
-                if (const size_t length = *lengthOpt; dataPtr.check_memory_and_move(length)) {
-                    return {Utf8{{strStartPtr, length}, false}};
-                }
-                return std::nullopt;
+            NODISCARD std::string to_str() const noexcept {
+                return {utf8Info.begin(), utf8Info.end()};
             }
 
-            template <typename Spec>
-            NODISCARD static constexpr bool check_and_move(parser::FileSymPtrBySpec<Spec>& dataPtr) noexcept {
+            template <typename SpecR>
+            NODISCARD static constexpr std::optional<Utf8> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
                 const auto lengthOpt =
-                        dataPtr.template memcpy_get_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
-                if (!lengthOpt)
+                        dataPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
+                if (!lengthOpt) [[unlikely]]
+                    return std::nullopt;
+
+                uint8_t* strStartPtr = dataPtr.i;
+                if (const size_t length = *lengthOpt; dataPtr.check_and_move(length)) [[likely]] {
+                    return std::make_optional(Utf8(std::span{strStartPtr, length}));
+                    // ReSharper disable once CppRedundantElseKeywordInsideCompoundStatement
+                } else {
+                    return std::nullopt;
+                }
+            }
+
+            template <typename SpecR>
+            NODISCARD static constexpr bool check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
+                const auto lengthOpt =
+                        dataPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
+                if (!lengthOpt) [[unlikely]]
                     return false;
                 const size_t length = *lengthOpt;
-                return dataPtr.check_memory_and_move(length);
+                return dataPtr.check_and_move(length);
+            }
+
+            NODISCARD bool deser(parser::FileWritePtrBySpec<auto>& dataPtr) const noexcept {
+                if (!dataPtr.deser_rev(static_cast<Utf8SizeT>(utf8Info.size()))) [[unlikely]] return false;
+                for (auto i : utf8Info) if (!dataPtr.deser(i)) [[unlikely]] return false;
+                return true;
+            }
+
+            ~Utf8() noexcept {
+                if constexpr (shouldFree) {
+                    delete[] utf8Info.data();
+                }
+            }
+
+            /*implicit*/ F_INLINE Utf8(const std::span<uint8_t> utf8Info) : utf8Info(utf8Info) {
+            }
+
+            explicit Utf8(Utf8&& old) noexcept : Utf8(old.utf8Info) {
+                old.utf8Info = {};
+            }
+
+            explicit Utf8(Utf8& old) noexcept : Utf8(old.utf8Info) {
+                old.utf8Info = {};
             }
         };
 
@@ -201,25 +240,34 @@ export namespace const_i {
         using String = inst::String;
         using MethodHandle = inst::MethodHandle;
         using MethodType = inst::MethodType;
-        using Dynamic = inst::AbsDynamic;
-        using Utf8 = inst::Utf8;
+        using Dynamic = inst::spec::Dynamic;
+        using Utf8 = inst::Utf8<>;
         using Fieldref = inst::spec::FRef;
         using Methodref = inst::spec::MRef;
         using InterfaceMethodref = inst::spec::IMRef;
         using NameAndType = inst::NameAndType;
-        using InvokeDynamic = inst::AbsDynamic;
+        using InvokeDynamic = inst::spec::IDynamic;
         using Module = inst::spec::Module;
         using Package = inst::spec::Package;
+
+        using Utf8Custom = inst::Utf8<true>;
+
+        struct EmptyVarValue {};
 
         using All = dstd::args::TypesTraits<Integer, Float, Long, Double, Class, String, MethodHandle, MethodType,
                                             Dynamic, Utf8, Fieldref, Methodref, InterfaceMethodref, NameAndType,
                                             InvokeDynamic, Module, Package>;
-        using variant = All::Wrap<cstd::variant_of_ptrs_and_little>;
 
-        std::string variant_to_str(const variant var) noexcept {
-            return var.deref_visit([] <typename Type>(Type&& value) -> std::string {
-                return value.to_str();
-            })
+        using VariantAllUnempt = All::Append<Utf8Custom>;
+        using VariantAll = VariantAllUnempt::Prepend<EmptyVarValue>;
+
+        using variant = VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr>;
+
+        using opt_variant = cstd::var_opt<variant>;
+
+        // ReSharper disable once CppPassValueParameterByConstReference
+        std::string variant_to_str(const variant var) noexcept { // NOLINT(*-unnecessary-value-param)
+            return var.deref_visit([]<typename Type>(Type&& value) -> std::string { return value.to_str(); });
         }
     } // namespace traits
 

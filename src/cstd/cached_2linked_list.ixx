@@ -216,7 +216,7 @@ export namespace c2l_list {
         }
 
         constexpr void foreach_link(this auto&& self, auto&& callable) noexcept {
-            self.foreachLinkInternal([&](Node* node) { callable(node->get_data()); });
+            self.foreach_link_internal([&](Node* node) { callable(node->get_data()); });
         }
 
     protected:

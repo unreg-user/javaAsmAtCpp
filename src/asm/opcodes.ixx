@@ -3,9 +3,10 @@ module;
 #include <cstdint>
 #include <variant>
 #include <array>
+#include <bit>
 
-#include "../cstd/macro.h"
 #include "opcodes_mcr.h"
+#include "../cstd/macro.h"
 
 export module opcodes;
 
@@ -15,7 +16,8 @@ import simple_cstd;
 
 namespace opcodes {
     export constexpr uint32_t magic = 0xCAFEBABE;
-    export constexpr auto magic_array = cstd::convert_to_array<uint8_t>(magic);
+    export constexpr uint32_t magic_rev = std::byteswap(magic);
+    export constexpr auto magic_array_rev = cstd::convert_to_array<uint8_t>(magic_rev);
 
     export namespace java_ts {
         using Int = uint32_t;
@@ -316,6 +318,14 @@ namespace opcodes {
         CONSTANT_Module = 19,
         CONSTANT_Package = 20
     };
+
+    export TagIdType as_number(TagIdEnum instance) {
+        return static_cast<TagIdType>(instance);
+    }
+
+    export TagIdEnum as_enum(TagIdType number) {
+        return static_cast<TagIdEnum>(number);
+    }
 
 #if 0
     enum class StackFrameTypes {

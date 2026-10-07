@@ -13,30 +13,38 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API "2182bf5c-ef0d-489a-91da-49dbc3090d2a")
 
 add_executable(javaAsmAtCpp src/main.cpp
+        src/asm/parser/base_classes/parser_b2.ixx
 )
 
 target_sources(javaAsmAtCpp
-        PRIVATE
-        src/asm/parser_mcr.h
-        src/asm/const_i_mcr.h
-        src/asm/insns_mcr.h
+        PUBLIC
+        src/asm/parser/parser_mcr.h
+        src/asm/impl_base/cp_consts_mcr.h
+        src/asm/impl_base/insns_mcr.h
         src/asm/opcodes_mcr.h
 
         PUBLIC
         src/main.cpp
         src/cstd/macro.h
+        src/cstd/macro_dstd.h
+        src/asm/impl_base/nodes/nodes_macro.h
 
         PUBLIC FILE_SET CXX_MODULES FILES
-        src/asm/opcodes.ixx
-        src/asm/nodes.ixx
-        src/asm/insns.ixx
         src/cstd/cstd_variant.ixx
         src/cstd/cached_2linked_list.ixx
         src/cstd/simple_cstd.ixx
         src/cstd/dstd.ixx
-        src/asm/const_i.ixx
-        src/asm/parser.ixx
         src/cstd/reader.ixx
+        src/cstd/ptr_function.ixx
+        src/asm/opcodes.ixx
+        src/asm/impl_base/nodes/nodes.ixx
+        src/asm/impl_base/insns.ixx
+        src/asm/parser/parser.ixx
+        src/asm/impl_base/cp_consts.ixx
+        src/asm/parser/parser_utils.ixx
+        src/asm/parser/parser_concepts.ixx
+        src/asm/parser/array_parsers.ixx
+        src/asm/utils/read_utils.ixx
+        src/asm/parser/base_classes/parser_b1.ixx
         src/compl_flags.ixx
-        src/asm/parser_utils.ixx
 )
