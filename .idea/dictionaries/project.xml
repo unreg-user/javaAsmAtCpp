@@ -1,8 +1,11 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>Cpool</w>
+      <w>Fieldref</w>
       <w>Ifaces</w>
       <w>Insn</w>
+      <w>Methodref</w>
       <w>Prevnearst</w>
       <w>aaload</w>
       <w>aastore</w>
@@ -20,6 +23,7 @@
       <w>caload</w>
       <w>castore</w>
       <w>checkcast</w>
+      <w>cpool</w>
       <w>daload</w>
       <w>dastore</w>
       <w>dcmpg</w>
@@ -68,6 +72,7 @@
       <w>ishr</w>
       <w>istore</w>
       <w>iushr</w>
+      <w>jaac</w>
       <w>ladd</w>
       <w>laload</w>
       <w>lastore</w>
@@ -101,6 +106,7 @@
       <w>sipush</w>
       <w>tableswitch</w>
       <w>traited</w>
+      <w>widst</w>
     </words>
   </dictionary>
 </component>

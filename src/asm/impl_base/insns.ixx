@@ -2,7 +2,7 @@ module;
 
 #include <iostream>
 #include "../../cstd/macro.h"
-#include "../insns_mcr.h"
+#include "insns_mcr.h"
 
 export module insns;
 

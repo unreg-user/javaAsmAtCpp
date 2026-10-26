@@ -14,51 +14,56 @@ import simple_cstd;
 
 // https://docs.oracle.com/javase/specs//jvms/se26/html/jvms-4.html
 
+/**
+*  ASM: a very small and fast Java bytecode manipulation framework
+ Copyright (c) 2000-2011 INRIA, France Telecom
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+ notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+ notice, this list of conditions and the following disclaimer in the
+ documentation and/or other materials provided with the distribution.
+ 3. Neither the name of the copyright holders nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ THE POSSIBILITY OF SUCH DAMAGE.
+ */
 namespace opcodes {
     export constexpr uint32_t magic = 0xCAFEBABE;
     export constexpr uint32_t magic_rev = std::byteswap(magic);
     export constexpr auto magic_array_rev = cstd::convert_to_array<uint8_t>(magic_rev);
 
-    export namespace java_ts {
-        using Int = uint32_t;
-        using Long = uint64_t;
-        using Float = Int;
-        using Double = Long;
-
-        using IntDT = Void;
-        using LongDT = Void;
-        using FloatDT = float;
-        using DoubleDT = double;
-
-        DU_UNION_VIA_AL_DT(Int);
-        DU_UNION_VIA_AL_DT(Float);
-        DU_UNION_VIA_AL_DT(Double);
-        DU_UNION_VIA_AL_DT(Long);
-    }
-
     export namespace Acc {
-        namespace Class {
-            using Type = uint16_t;
+        using Type = uint16_t;
 
-            constexpr Type PUBLIC = 0x0001;
-            constexpr Type FINAL = 0x0010;
-            constexpr Type SUPER = 0x0020;
-            constexpr Type INTERFACE = 0x0200;
-            constexpr Type ABSTRACT = 0x0400;
-            constexpr Type SYNTHETIC = 0x1000;
-            constexpr Type ANNOTATION = 0x2000;
-            constexpr Type ENUM = 0x4000;
-            constexpr Type MODULE = 0x8000;
-        } // namespace Class
+        constexpr Type PUBLIC = 0x0001;
+        constexpr Type FINAL = 0x0010;
+        constexpr Type SUPER = 0x0020;
+        constexpr Type INTERFACE = 0x0200;
+        constexpr Type ABSTRACT = 0x0400;
+        constexpr Type SYNTHETIC = 0x1000;
+        constexpr Type ANNOTATION = 0x2000;
+        constexpr Type ENUM = 0x4000;
+        constexpr Type MODULE = 0x8000;
 
-        using Type = uint32_t;
-
-        constexpr Type PUBLIC = 0x0001; // class, field, method
         constexpr Type PRIVATE = 0x0002; // class, field, method
         constexpr Type PROTECTED = 0x0004; // class, field, method
         constexpr Type STATIC = 0x0008; // field, method
-        constexpr Type FINAL = 0x0010; // class, field, method, parameter
-        constexpr Type SUPER = 0x0020; // class
         constexpr Type SYNCHRONIZED = 0x0020; // method
         constexpr Type OPEN = 0x0020; // module
         constexpr Type TRANSITIVE = 0x0020; // module requires
@@ -68,16 +73,10 @@ namespace opcodes {
         constexpr Type VARARGS = 0x0080; // method
         constexpr Type TRANSIENT = 0x0080; // field
         constexpr Type NATIVE = 0x0100; // method
-        constexpr Type INTERFACE = 0x0200; // class
-        constexpr Type ABSTRACT = 0x0400; // class, method
         constexpr Type STRICT = 0x0800; // method
-        constexpr Type SYNTHETIC = 0x1000; // class, field, method, parameter, module *
-        constexpr Type ANNOTATION = 0x2000; // class
-        constexpr Type ENUM = 0x4000; // class(?) field inner
         constexpr Type MANDATED = 0x8000; // field, method, parameter, module, module *
-        constexpr Type MODULE = 0x8000; // class
-        constexpr Type RECORD = 0x10000; // class
-        constexpr Type DEPRECATED = 0x20000; // class, field, method
+        //constexpr Type RECORD = 0x10000; // class
+        //constexpr Type DEPRECATED = 0x20000; // class, field, method
     } // namespace Acc
 
     export enum class NewArrType : std::int8_t {
@@ -338,8 +337,4 @@ namespace opcodes {
         UNINITIALIZED_THIS = Frame.ITEM_UNINITIALIZED_THIS,
     };
 #endif
-    /*export {
-        using VerType = Ver::Type;
-        using AccType = Acc::Type;
-    }*/
 } // namespace opcodes

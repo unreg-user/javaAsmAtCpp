@@ -5,7 +5,7 @@
 // clang-format off
 
 #define OR_ELSE_OPT_UNEX(type, name, opt_value, unex) OR_ELSE_OPT(type, name, opt_value, return std::unexpected{unex};)
-#define OR_ELSE_OPT_UNEX_DECLARATED(type, name, opt_value, unex) OR_ELSE_OPT_DECLARATED(type, name, opt_value, return std::unexpected{unex};)
+#define OR_ELSE_OPT_UNEX_DECLARED(type, name, opt_value, unex) OR_ELSE_OPT_DECLARED(type, name, opt_value, return std::unexpected{unex};)
 
 #define REQ_REQ(...) requires { requires __VA_ARGS__; }
 
@@ -20,6 +20,7 @@
 #define CHECK_FIELD_EXISTS(instance, name) REQ_REQ(!cstd::is_func_ptr<decltype(&instance.name)>)
 #define CHECK_FIELD_EXISTS_T(type, name) CHECK_FIELD_EXISTS(std::declval<type>(), name)
 #define CONSTEXPR_TERN_OP(cond, ret1, ret2) [&] () -> decltype(auto) { if constexpr (cond) { return (ret1); } else { return (ret2); } } ()
+#define PUSH_BACK(coll, ...) if constexpr ( requires { { cool.jaac() } -> std::same_as<bool>; } )
 
 #define OPT_ARRAY_HANDLE_INIT(name, uName, path, sizeT, errValidType, ...) \
         DEF_CNT_FLAG_GEN(handleWritten##uName, HandleMode); \
@@ -27,7 +28,7 @@
         T_CO_FLAG hasCorrectTranslate##uName = REQ_REQ(JaacTranslator<decltype(classNode.path)>); \
         T_CO_FLAG hasCorrectAppend##uName = hasCorrect##uName && hasCorrectTranslate##uName; \
         static_assert((handleWritten##uName##Flag == HandleMode::NONE && hasCorrectTranslate##uName) || (handleWritten##uName##Flag == HandleMode::APPEND && hasCorrectAppend##uName) || (handleWritten##uName##Flag == HandleMode::FULL && hasCorrect##uName), \
-        "Invalid "#path" field type (valid requires "##errValidType##" (from asm.parser_utils, if mode != NONE) and JaacCollectionTranslatePart<TYPE> (from asm.parser_utils, if mode = APPEND)) or undeclarated"); \
+        "Invalid "#path" field type (valid requires "##errValidType##" (from asm.parser_utils, if mode != NONE) and JaacCollectionTranslatePart<TYPE> (from asm.parser_utils, if mode = APPEND)) or undeclared"); \
         DEF_OR_ELSE_OPT_UNEX(sizeT, name##_size); \
         if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_first(readPtr.i); classNode.path.jaac_set_source_data_size(name##_size); }\
 
@@ -39,42 +40,20 @@
             if constexpr ( requires { classNode.path.jaac_start_handle(classNode); } ) classNode.path.jaac_start_handle(classNode); \
         } \
         __VA_ARGS__; \
-        if constexpr (handleWritten##uName##Flag  != HandleMode::NONE && requires { classNode.path.jaac_postcomplete_handle(classNode); }) { \
+        if constexpr (handleWritten##uName##Flag != HandleMode::NONE && requires { classNode.path.jaac_postcomplete_handle(classNode); }) { \
             classNode.path.jaac_postcomplete_handle(classNode); \
         } \
         if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_last(readPtr.i - 1); }
+
+#define DEF_DESER(uName, path, hasParseSizeAndSkip0, ...) deser_array<handleWritten##uName##Flag, hasParseSizeAndSkip0, SpecR, SpecW>(writePtr, classNode.path, __VA_ARGS__)
+#define DEF_FLAGS_PRIM_DESER(uName, path) DEF_DESER(uName, path, false, [&] (auto value) { writePtr.deser(value); })
+#define DEF_NUM_PRIM_DESER(uName, path) DEF_DESER(uName, path, false, [&] (auto value) { writePtr.deser_rev(value); })
 
 #define DEF_OPT_ARRAY_HANDLE(name, uName, path, inElT, outElT, ...) \
         DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path, inElT, outElT) \
         DEF_MIDDLE_END_ARRAY_HANDLE_PART(name, uName, path, __VA_ARGS__)
 
-#define ARRAY_SIZE_WR_BACK(name, uName, path, iswr_parse) \
-        if constexpr (handleWritten##uName##Flag == HandleMode::FULL) { \
-            defBackAddingLambda(classNode.path.jaac_get##iswr_parse##_size()); \
-        } else if constexpr (handleWritten##uName##Flag == HandleMode::APPEND) { \
-            defBackAddingLambda(classNode.path.jaac_get_source_data_size() + classNode.path.jaac_get##iswr_parse##_size()); \
-        } else { \
-            defBackAddingLambda(classNode.path.jaac_get_source_data_size()); \
-        } \
-        if constexpr (handleWritten##uName##Flag != HandleMode::FULL) { \
-            outData.append_range(FileReadPtr{classNode.path.jaac_get_source_data_first(), classNode.path.jaac_get_source_data_last()}); \
-        }
-
-#define DEF_ARRAY_SIZE_WR_BACK(name, uName, path) ARRAY_SIZE_WR_BACK(name, uName, path,)
-#define ARRAY_SIZE_WR_BACK_WITH_PSIZE(name, uName, path) ARRAY_SIZE_WR_BACK(name, uName, path, _parse)
-
-#define ABS_ARRAY_BACK(name, uName, path, type, ...) \
-            if constexpr (hasCorrect##uName) { \
-                DEF_JAAC_FOR(name, path, type, __VA_ARGS__); \
-            }
-
-#define PRIM_ARRAY_BACK(name, uName, path) ABS_ARRAY_BACK(name, uName, path, auto, { DEF_ASSERT_UNEX(writePtr.deser_rev(i_##name)) })
-#define DEF_ARRAY_BACK(name, uName, path) ABS_ARRAY_BACK(name, uName, path, auto, { DEF_ASSERT_UNEX(i_##name.back(writePtr)) })
-
-#define DEF_PRIM_FULL_ARRAY_BACK(name, uName, path) DEF_ARRAY_SIZE_WR_BACK(name, uName, path) PRIM_ARRAY_BACK(name, uName, path)
-#define DEF_FULL_ARRAY_BACK(name, uName, path) DEF_ARRAY_SIZE_WR_BACK(name, uName, path) DEF_ARRAY_BACK(name, uName, path)
-
-#define DEF_ARRAY_FINAL_H(uName, path) \
+#define DEF_ARRAY_FINAL_H_CALL(uName, path) \
             if constexpr (handleWritten##uName##Flag != HandleMode::NONE && requires { classNode.path.jaac_final_handle(classNode); }) { \
                 classNode.path.jaac_final_handle(classNode); \
             }
@@ -156,9 +135,3 @@
 #define DEF_HANDLE(type, name) HANDLE(name, name, type, name)
 
 #define DEF_FULL_HANDLE(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_HANDLE(type, name); if constexpr (useWriteFlag) {defBackAddingLambda1(name)}
-
-#define EL_CONC_WRAPPER(name) \
-    struct name##ConcWrapper { \
-        template <typename T> \
-        T_CO_FLAG Value = name<T>; \
-    };

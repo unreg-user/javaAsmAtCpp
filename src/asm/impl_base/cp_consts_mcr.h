@@ -4,20 +4,20 @@
 
 #define DEF_DEF_CREATE(mPrefix, Self) \
     template <typename SpecR>\
-    NODISCARD static std::optional<Self> mPrefix##parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept { \
-        return dataPtr.template parse_rev<Self>(); \
+    NODISCARD static std::optional<Self> mPrefix##parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return readPtr.template parse_rev<Self>(); \
     }
 
 #define DEF_DEF_CHECK_AND_MOVE(mPrefix, Self) \
     template <typename SpecR> \
-    NODISCARD static constexpr bool mPrefix##check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept { \
-        return dataPtr.template check_and_move<Self>(); \
+    NODISCARD static constexpr bool mPrefix##check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return readPtr.template check_and_move<Self>(); \
     }
 
 #define DEF_DEF_DESER(mPrefix, ...) \
     template <typename SpecW> \
-    NODISCARD bool mPrefix##deser(parser::FileWritePtrBySpec<SpecW>& dataPtr) const noexcept { \
-        return reader::utils::deser_rev(dataPtr, __VA_ARGS__); \
+    void mPrefix##deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept { \
+        reader::utils::deser_rev(writePtr, __VA_ARGS__); \
     }
 
 #define DEF_CREATE(Self) DEF_DEF_CREATE(, Self)
@@ -39,14 +39,14 @@
 
 #define DEF_ABS_EXT_CREATE(Self) \
     template <typename SpecR> \
-    NODISCARD static std::optional<Self> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept { \
-        return Self::template abs_parse<SpecR>(dataPtr).transform(cstd::ext_cast_lambda<Self>); \
+    NODISCARD static std::optional<Self> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return Self::template abs_parse<SpecR>(readPtr).transform(cstd::ext_cast_lambda<Self>); \
     }
 
 #define DEF_ABS_EXT_CHECK_AND_MOVE(Self) \
     template <typename SpecR> \
-    NODISCARD static constexpr bool check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept { \
-        return Self::template abs_check_and_move<SpecR>(dataPtr); \
+    NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return Self::template abs_check_and_move<SpecR>(readPtr); \
     }
 
 #define DEF_ABS_EXT_R_METHODS(Self) DEF_ABS_EXT_CREATE(Self) DEF_ABS_EXT_CHECK_AND_MOVE(Self)

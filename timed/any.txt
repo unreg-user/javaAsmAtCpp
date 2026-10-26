@@ -1068,3 +1068,180 @@ if constexpr (timed_pre1) { \
             return span_to_syms_iterator<ElType, Sym, span_size>{self.t, SymsPerEl};
         }
     };
+
+    template <typename T, size_t maxSize>
+    struct vec_array {
+        std::array<T, maxSize> array{};
+        size_t size = 0;
+
+        using iterator = std::_Array_iterator<T, maxSize>;
+        using const_iterator = std::_Array_const_iterator<T, maxSize>;
+        using reverse_iterator = std::reverse_iterator<iterator>;
+        using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+        constexpr void push_back(const T& elem) {
+            array[size++] = elem;
+        }
+
+        constexpr void push_back(T&& elem) {
+            array[size++] = std::move(elem);
+        }
+
+        constexpr decltype(auto) operator[](this auto&& self, size_t i) {
+            return self.array[i];
+        }
+
+        NODISCARD constexpr iterator end() noexcept {
+            return iterator(array._Elems, size);
+        }
+
+        NODISCARD constexpr const_iterator end() const noexcept {
+            return const_iterator(array._Elems, size);
+        }
+
+        NODISCARD constexpr const_iterator cend() const noexcept {
+            return end();
+        }
+
+        NODISCARD constexpr auto begin(this auto&& self) {
+            return self.array.begin();
+        }
+
+        NODISCARD constexpr auto cbegin(this auto&& self) {
+            return self.array.cbegin();
+        }
+    };
+
+
+            if constexpr (hasCorrectCpool) {
+                DEF_SKIP0_JAAC_FOR(cpool, cpool, cp_consts::traits::variant,
+                                   {DEF_ASSERT_UNEX(i_cpool.deref_visit([&](auto&& self) {
+                                       return writePtr.memcpy_back_rev(opcodes::as_number(self.TAG_ID)) &&
+                                              self.back(writePtr);
+                                   }))});
+            }
+
+        template <typename T, typename SpecR>
+        struct SomeParser {
+            static_assert(cstd::static_assert_false<T, SpecR>);
+        };
+
+        template <typename T>
+        concept IsSerDeserPrimitive = cstd::is_cont_in<T, Primitive> || cstd::is_cont_in<T, Flag>;
+
+        template <typename T, typename SpecR> requires JaacParsable<T, SpecR>
+        struct SomeParser<T, SpecR> {
+            F_INLINE static std::optional<T> parse(ReadPtrBySpec<SpecR>& readPtr) {
+                return T::template parse(readPtr);
+            }
+
+            F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+                return T::template check_and_move(readPtr);
+            }
+        };
+
+        template <typename T, typename SpecR>
+        struct SomeParser<Primitive<T>, SpecR> {
+            F_INLINE static std::optional<T> parse(ReadPtrBySpec<SpecR>& readPtr) {
+                return readPtr.template parse_rev<T>();
+            }
+
+            F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+                return readPtr.template check_and_move<T>();
+            }
+        };
+
+        template <typename T, typename SpecR>
+        struct SomeParser<Flag<T>, SpecR> {
+            F_INLINE static std::optional<T> parse(ReadPtrBySpec<SpecR>& readPtr) {
+                return readPtr.template parse<T>();
+            }
+
+            F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+                return readPtr.template check_and_move<T>();
+            }
+        };
+
+        template <typename T, typename SpecR>
+        concept ParserableAnyway = JaacParsable<T, SpecR> || IsSerDeserPrimitive<T>;
+
+        template <typename T, typename SpecW>
+        struct SomeDeserr {
+            static_assert(cstd::static_assert_false<T, SpecW>);
+        };
+
+        template <typename T, typename SpecW> requires JaacDeserable<T, SpecW>
+        struct SomeDeserr<T, SpecW> {
+            F_INLINE static auto deser(WritePtrBySpec<SpecW>& writePtr, T obj) {
+                return obj.deser(writePtr);
+            }
+        };
+
+        template <typename T, typename SpecW>
+        struct SomeDeserr<Primitive<T>, SpecW> {
+            F_INLINE static cstd::true_void deser(WritePtrBySpec<SpecW>& writePtr, T obj) {
+                writePtr.deser_rev(obj);
+                return {};
+            }
+        };
+
+        template <typename T, typename SpecW>
+        struct SomeDeserr<Flag<T>, SpecW> {
+            F_INLINE static cstd::true_void deser(WritePtrBySpec<SpecW>& writePtr, T obj) {
+                writePtr.deser(obj);
+                return {};
+            }
+        };
+
+        template <typename T, typename SpecW>
+        concept DeserializableAnyway = JaacDeserable<T, SpecW>  || IsSerDeserPrimitive<T>;
+
+#if 0
+    template <typename RawElType, typename SizeT = ArraySizeT>
+    struct RawJaacSpan : std::span<RawElType> {
+        using std::span<RawElType>::span;
+
+        template <typename SpecR>
+        static RawJaacSpan parse(ReadPtrBySpec<SpecR>& readPtr) {
+            auto sizeOpt = readPtr.template parse_rev<SizeT>();
+            if (!sizeOpt) [[unlikely]]
+                return std::nullopt;
+            auto dataOpt =
+        }
+    };
+#endif
+
+    template <typename DirT> requires !cstd::larger_t_ptr<std::remove_cv_t<DirT>>
+    decltype(auto) unwrapIfWid(DirT widst) noexcept {
+        if constexpr (requires { getWidstructDefBaser<std::remove_cvref_t<DirT>>::Result; } ) {
+            return unwrap(widst);
+        } else {
+            return widst;
+        }
+    }
+
+    template <typename DirT> requires cstd::larger_t_ptr<std::remove_cv_t<DirT>>
+    decltype(auto) unwrapIfWid(DirT& widst) noexcept {
+        if constexpr (!std::same_as<TB, void>) {
+            return unwrap(widst);
+        } else {
+            return widst;
+        }
+    }
+
+    export namespace java_ts {
+        using Int = uint32_t;
+        using Long = uint64_t;
+        using Float = Int;
+        using Double = Long;
+
+        using IntDT = Void;
+        using LongDT = Void;
+        using FloatDT = float;
+        using DoubleDT = double;
+
+        DU_UNION_VIA_AL_DT(Int);
+        DU_UNION_VIA_AL_DT(Float);
+        DU_UNION_VIA_AL_DT(Double);
+        DU_UNION_VIA_AL_DT(Long);
+    }

@@ -15,6 +15,11 @@ export module simple_cstd;
 
 export struct Void {};
 
+export {
+    using f32_t = float;
+    using f64_t = double;
+}
+
 export namespace cstd {
     template <typename... Callables>
     struct overload : Callables... {
@@ -44,6 +49,17 @@ export namespace cstd {
 
     template <typename T>
     using GetMinNumStrUType = std::conditional_t<std::same_as<T, uint8_t>, uint16_t, T>;
+
+    template <typename T, typename Y>
+    struct pair_cast_mxn {
+        std::pair<T, Y> to_pair(this auto&& self) {
+            return std::pair<T, Y>{self.first, self.second};
+        }
+
+        /*implicit*/ operator std::pair<T, Y>(this auto&& self) noexcept {
+            return self.to_pair();
+        }
+    };
 
     template <typename T2>
     struct cast_lambda_t {
@@ -232,51 +248,8 @@ export namespace cstd {
         }
     }
 
-    template <typename T, size_t maxSize>
-    struct vec_array {
-        std::array<T, maxSize> array{};
-        size_t size = 0;
-
-        using iterator = std::_Array_iterator<T, maxSize>;
-        using const_iterator = std::_Array_const_iterator<T, maxSize>;
-        using reverse_iterator = std::reverse_iterator<iterator>;
-        using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-
-        constexpr void push_back(const T& elem) {
-            array[size++] = elem;
-        }
-
-        constexpr void push_back(T&& elem) {
-            array[size++] = std::move(elem);
-        }
-
-        constexpr decltype(auto) operator[](this auto&& self, size_t i) {
-            return self.array[i];
-        }
-
-        NODISCARD constexpr iterator end() noexcept {
-            return iterator(array._Elems, size);
-        }
-
-        NODISCARD constexpr const_iterator end() const noexcept {
-            return const_iterator(array._Elems, size);
-        }
-
-        NODISCARD constexpr const_iterator cend() const noexcept {
-            return end();
-        }
-
-        NODISCARD constexpr auto begin(this auto&& self) {
-            return self.array.begin();
-        }
-
-        NODISCARD constexpr auto cbegin(this auto&& self) {
-            return self.array.cbegin();
-        }
-    };
-
     template <typename T>
-    decltype(auto) forward_cpy(T value) {
+    decltype(auto) forward_from_cpy(T value) {
         if constexpr (std::is_rvalue_reference_v<T>) {
             return static_cast<T&&>(value);
         } else if constexpr (std::is_lvalue_reference_v<T>) {

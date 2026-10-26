@@ -8,7 +8,7 @@ export module array_parsers;
 
 import opcodes;
 import parser_utils;
-import const_i;
+import cp_consts;
 import read_utils;
 
 export namespace parser {
@@ -21,8 +21,8 @@ export namespace parser {
         }
     }
 
-    template <HandleMode handleWritten, bool hasParseSize = false, typename SpecW>
-    static void deser_array(FileWritePtrBySpec<SpecW>& writePtr, auto&& jaacArray, auto&& deserializer) {
+    template <HandleMode handleWritten, bool hasParseSize = false, typename SpecR, typename SpecW, bool skip0 = hasParseSize>
+    static void deser_array(WritePtrBySpec<SpecW>& writePtr, auto&& jaacArray, auto&& deserializer1) {
         if constexpr (handleWritten == HandleMode::FULL) {
             writePtr.deser_rev(get_array_deser_size<hasParseSize>(jaacArray));
         } else if constexpr (handleWritten == HandleMode::APPEND) {
@@ -31,15 +31,22 @@ export namespace parser {
             writePtr.deser_rev(jaacArray.jaac_get_source_data_size());
         }
         if constexpr (handleWritten != HandleMode::FULL) { 
-            writePtr.(FileReadPtr{classNode.path.jaac_get_source_data_first(), classNode.path.jaac_get_source_data_last()});
+            writePtr.deser_range(ReadPtrBySpec<SpecR>{jaacArray.jaac_get_source_data_first(), jaacArray.jaac_get_source_data_last()});
+        }
+
+        auto end = jaacArray.jaac_end();
+        auto begin = jaacArray.jaac_begin();
+        if constexpr (skip0) ++begin;
+        for (auto iter = begin; iter != end; ++iter) {
+            deserializer1(*iter);
         }
     }
     
     template <typename SpecR>
-    static FileReadPtrBySpec<SpecR> parse_att_interval(FileReadPtrBySpec<SpecR>& readPtr) {
+    static ReadPtrBySpec<SpecR> parse_att_interval(ReadPtrBySpec<SpecR>& readPtr) {
         auto readPtr2 = readPtr;
-        if (!readPtr.template check_memory_and_move<CPoolSizeT>()) [[unlikely]] return {nullptr, nullptr}; // name_idx
-        auto length = readPtr.template memcpy_get_rev<AttSizeT>();
+        if (!readPtr.template check_memory_and_move<CpoolSizeT>()) [[unlikely]] return {nullptr, nullptr}; // name_idx
+        auto length = readPtr.template memcpy_get_rev<AttrSizeT>();
         if (!length) [[unlikely]] return {nullptr, nullptr};
         if (!readPtr.check_memory_and_move(length)) [[unlikely]] return {nullptr, nullptr};
         readPtr2.last = readPtr.i - 1;
@@ -47,7 +54,7 @@ export namespace parser {
     }
 
     template <bool handle = false, typename SpecR>
-    static ParseErr parse1_const_big_ctx(FileReadPtrBySpec<SpecR>& readPtr, auto&& handler, auto&& skipHandler) {
+    static ParseErr parse1_const_big_ctx(ReadPtrBySpec<SpecR>& readPtr, auto&& handler, auto&& skipHandler) {
         DEF_OR_ELSE_OPT_INVALID(opcodes::TagIdType, tagIdRaw);
         auto tagId = opcodes::as_enum(tagIdRaw);
 
@@ -66,7 +73,7 @@ export namespace parser {
             }
         }();
 
-        auto result = cp_consts::swith_tag_id_enum_2compl<
+        auto result = cp_consts::switch_tag_id_enum_2compl<
                 std::conditional_t<handle, cp_consts::traits::opt_variant, bool>>(tagId, handle_lambda);
 
         DEF_ASSERT_INVALID(result);
@@ -82,7 +89,7 @@ export namespace parser {
     }
 
     template <bool handle = false, typename SpecR>
-    static ParseErr parse1_const(FileReadPtrBySpec<SpecR>& readPtr, auto&& handler) {
+    static ParseErr parse1_const(ReadPtrBySpec<SpecR>& readPtr, auto&& handler) {
         return parse1_const_big_ctx<handle>(readPtr, [&] (opcodes::TagIdEnum, cp_consts::traits::variant result) { handler(result); }, []{});
     }
 } // namespace parser

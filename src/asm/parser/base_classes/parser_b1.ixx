@@ -9,6 +9,7 @@ export module parser_b1;
 
 import read_utils;
 import parser_utils;
+import simple_cstd;
 
 export namespace parser::common {
     struct Translator {
@@ -45,31 +46,34 @@ export namespace parser::common {
         }
     };
 
-    struct FieldInfo {
-        AccessFlagsDefT access_flags;
-        CPoolSizeT name_idx, descriptor_idx;
+    template <typename Base>
+    struct JaacIterableMxn : Base {
+        using Base::Base;
 
-        template <typename SpecR>
-        static std::optional<FieldInfo> parse(FileReadPtrBySpec<SpecR>& readPtr) {
-            auto access_flags = readPtr.template parse<AccessFlagsDefT>();
-            auto name_idx = readPtr.template parse_rev<CPoolSizeT>();
-            auto descriptor_idx = readPtr.template parse_rev<CPoolSizeT>();
-            auto attrInterval = parse_att_interval(readPtr);
-            return access_flags && name_idx && descriptor_idx && attrInterval.i
-                           ? std::make_optional(FieldInfo{.access_flags = *access_flags,
-                                                          .name_idx = *name_idx,
-                                                          .descriptor_idx = *descriptor_idx})
-                           : std::nullopt;
+        auto jaac_begin(this auto&& self) {
+            return self.begin();
         }
 
-        template <typename SpecR>
-        static bool check_and_move(FileReadPtrBySpec<SpecR>& readPtr) {
-            return reader::utils::check_and_move<AccessFlagsDefT, CPoolSizeT, CPoolSizeT>(readPtr) && parse_att_interval(readPtr).i;
+        auto jaac_end(this auto&& self) {
+            return self.end();
+        }
+    };
+
+    template <typename IBase>
+    struct JaacCollectionMxn : JaacIterableMxn<IBase> {
+        using JaacIterableMxn<IBase>::JaacIterableMxn;
+
+        void jaac_reserve(this auto&& self, size_t i) {
+            self.reserve(i);
         }
 
-        template <typename SpecW>
-        bool back(FileWritePtrBySpec<SpecW>& readPtr) {
-            return readPtr.deser(access_flags) && reader::utils::deser_rev(readPtr, name_idx, descriptor_idx);
+        gstd::true_void jaac_push_back(this auto&& self, auto&& element) {
+            self.push_back(std::forward<decltype(element)>(element));
+            return {};
+        }
+
+        auto jaac_size(this auto&& self) {
+            return self.size();
         }
     };
 } // namespace parser::common

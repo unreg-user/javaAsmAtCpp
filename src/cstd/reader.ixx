@@ -126,10 +126,10 @@ export namespace reader {
         Sym* i;
         Sym* last;
 
-        explicit ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size) {
+        explicit ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size - 1) {
         }
 
-        explicit ReadPtr(std::span<Sym> data) noexcept : i(data.data()), last(data.data() + data.size()) {
+        explicit ReadPtr(std::span<Sym> data) noexcept : i(data.data()), last(data.data() + data.size() - 1) {
         }
 
         explicit ReadPtr(const ReadPtr& other) noexcept : i(other.i), last(other.last) {
@@ -270,29 +270,33 @@ export namespace reader {
         explicit WriteVecPtr(const WriteVecPtr& other) noexcept : vec(other.vec) {
         }
 
-        template <std::_Container_compatible_range<Sym> RangeT>
-        NODISCARD F_INLINE void deser_range(RangeT&& from) noexcept {
-            vec.append_range(from);
+        template <typename RangeT>
+        F_INLINE gstd::true_void deser_range(RangeT&& from) noexcept {
+            vec.append_range(std::forward<RangeT>(from));
+            return {};
         }
 
         template <typename Type>
-        NODISCARD F_INLINE void deser_via_func(Type&& from, auto&& callable) noexcept {
+        F_INLINE gstd::true_void deser_via_func(Type&& from, auto&& callable) noexcept {
             static_assert(sizeof(Type) % sizeof(Sym) == 0, "cannot containing in symbols");
 
             auto handled = callable(from);
             auto range = std::span<const Sym, sizeof(Type) / sizeof(Sym)>(reinterpret_cast<const Sym*>(&handled),
                                                                           sizeof(Type) / sizeof(Sym));
             vec.append_range(range);
+            return {};
         }
 
         template <typename Type>
-        NODISCARD F_INLINE void deser(Type&& from) noexcept {
-            return deser_via_func(from, cstd::identify_lambda);
+        F_INLINE gstd::true_void deser(Type&& from) noexcept {
+            deser_via_func(from, cstd::identify_lambda);
+            return {};
         }
 
         template <typename Type>
-        NODISCARD F_INLINE void deser_rev(Type&& from) noexcept {
-            return deser_via_func(from, cstd::byteswap_v_func);
+        F_INLINE gstd::true_void deser_rev(Type&& from) noexcept {
+            deser_via_func(from, cstd::byteswap_v_func);
+            return {};
         }
     };
 

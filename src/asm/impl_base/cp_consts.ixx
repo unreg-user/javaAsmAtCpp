@@ -9,7 +9,7 @@ module;
 #include "../../cstd/macro.h"
 #include "cp_consts_mcr.h"
 
-export module const_i;
+export module cp_consts;
 
 import simple_cstd;
 import compl_flags;
@@ -18,27 +18,44 @@ import parser_utils;
 import dstd;
 import cstd_variant;
 import read_utils;
+import parser_wrappers_b2;
+import gstd;
 
 export namespace cp_consts {
-    using SizeT = parser::CPoolSizeT;
+    using SizeT = parser::wrappers::CpoolIdx;
+    using RefKindT = parser::common::wrappers::Number<uint8_t>;
+
     namespace inst {
-        template <typename PrType>
+        template <typename Prim, typename RawPrim = gstd::getWidstructDefBaser<Prim>::Result>
         struct AbsPrimitive {
-            PrType value;
+            Prim value;
 
             NODISCARD std::string to_str() const noexcept {
-                return std::to_string(static_cast<cstd::GetMinNumStrUType<PrType>>(value));
+                return std::to_string(gstd::unwrap(static_cast<cstd::GetMinNumStrUType<RawPrim>>(value)));
             }
 
-            DEF_ABS_METHODS_PACK(AbsPrimitive, value)
+            template <typename SpecW>
+            void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                value.deser(writePtr);
+            }
+
+        protected:
+            template <typename SpecR>
+            NODISCARD static std::optional<AbsPrimitive> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return std::make_optional(AbsPrimitive{Prim::parse(readPtr)});
+            }
+            template <typename SpecR>
+            NODISCARD static constexpr bool abs_check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return Prim::check_and_move(readPtr);
+            }
         };
 
         struct Class {
             SizeT classIdx;
             DEF_TAG_FLAG(CONSTANT_Class)
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(classIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(classIdx));
             }
 
             DEF_METHODS(Class, classIdx)
@@ -48,16 +65,17 @@ export namespace cp_consts {
             SizeT classIdx;
             SizeT nameAndTypeIdx;
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(classIdx) + ".#" + std::to_string(nameAndTypeIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(classIdx)) + ".#" +
+                       std::to_string(gstd::unwrap(nameAndTypeIdx));
             }
 
             DEF_DESER(classIdx, nameAndTypeIdx)
 
         protected:
             template <typename SpecR>
-            NODISCARD static std::optional<AbsMF> abs_parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                return reader::utils::parse_rev<AbsMF, decltype(classIdx), decltype(nameAndTypeIdx)>(dataPtr);
+            NODISCARD static std::optional<AbsMF> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return reader::utils::parse_rev<AbsMF, decltype(classIdx), decltype(nameAndTypeIdx)>(readPtr);
             }
 
             DEF_ABS_CHECK_AND_MOVE(AbsMF)
@@ -67,8 +85,8 @@ export namespace cp_consts {
             SizeT stringIdx;
             DEF_TAG_FLAG(CONSTANT_String)
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(stringIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(stringIdx));
             }
 
             DEF_METHODS(String, stringIdx)
@@ -77,34 +95,36 @@ export namespace cp_consts {
         struct AbsMP {
             SizeT nameIdx;
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(nameIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(nameIdx));
             }
 
             DEF_ABS_METHODS_PACK(AbsMP, nameIdx)
         };
 
         struct MethodHandle {
-            uint16_t refIdx;
-            uint8_t refKind;
+            SizeT refIdx;
+            RefKindT refKind;
             DEF_TAG_FLAG(CONSTANT_MethodHandle)
 
-            NODISCARD std::string to_str() const noexcept {
-                return std::to_string(refKind) + ":#" + std::to_string(refIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return std::to_string(gstd::unwrap(refKind)) + ":#" + std::to_string(gstd::unwrap(refIdx));
             }
 
             template <typename SpecR>
-            NODISCARD static constexpr std::optional<MethodHandle> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                const auto refKind = dataPtr.template parse_rev<uint8_t>();
-                const auto refIdx = dataPtr.template parse_rev<uint16_t>();
+            NODISCARD static constexpr std::optional<MethodHandle>
+            parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                const auto refKind = readPtr.template parse_rev<uint8_t>();
+                const auto refIdx = readPtr.template parse_rev<SizeT>();
                 if (!(refKind && refIdx)) [[unlikely]]
                     return std::nullopt;
                 return {MethodHandle{.refIdx = *refIdx, .refKind = *refKind}};
             }
 
             template <typename SpecR>
-            NODISCARD static constexpr bool check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                return reader::utils::check_and_move<decltype(refIdx), decltype(refKind)>(dataPtr);;
+            NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return reader::utils::check_and_move<decltype(refIdx), decltype(refKind)>(readPtr);
+                ;
             }
 
             DEF_DESER(refKind, refIdx)
@@ -114,13 +134,13 @@ export namespace cp_consts {
             SizeT nameIdx, descIdx;
             DEF_TAG_FLAG(CONSTANT_NameAndType)
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(nameIdx) + ":#" + std::to_string(descIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(nameIdx)) + ":#" + std::to_string(gstd::unwrap(descIdx));
             }
 
             template <typename SpecR>
-            NODISCARD static std::optional<NameAndType> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                return reader::utils::parse_rev<NameAndType, decltype(nameIdx), decltype(descIdx)>(dataPtr);
+            NODISCARD static std::optional<NameAndType> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return reader::utils::parse_rev<NameAndType, decltype(nameIdx), decltype(descIdx)>(readPtr);
             }
 
             DEF_DESER(nameIdx, descIdx)
@@ -131,8 +151,8 @@ export namespace cp_consts {
             SizeT descIdx;
             DEF_TAG_FLAG(CONSTANT_MethodType)
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(descIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(descIdx));
             }
 
             DEF_METHODS(MethodType, descIdx)
@@ -141,16 +161,18 @@ export namespace cp_consts {
         struct AbsDynamic {
             SizeT bootstrapMethodAttrIdx, nameAndTypeIdx;
 
-            NODISCARD std::string to_str() const noexcept {
-                return "#" + std::to_string(bootstrapMethodAttrIdx) + ":#" + std::to_string(nameAndTypeIdx);
+            NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
+                return "#" + std::to_string(gstd::unwrap(bootstrapMethodAttrIdx)) + ":#" +
+                       std::to_string(gstd::unwrap(nameAndTypeIdx));
             }
 
             DEF_DESER(bootstrapMethodAttrIdx, nameAndTypeIdx)
 
         protected:
             template <typename SpecR>
-            NODISCARD static std::optional<AbsDynamic> abs_parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                return reader::utils::parse_rev<AbsDynamic, decltype(bootstrapMethodAttrIdx), decltype(nameAndTypeIdx)>(dataPtr);
+            NODISCARD static std::optional<AbsDynamic> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return reader::utils::parse_rev<AbsDynamic, decltype(bootstrapMethodAttrIdx), decltype(nameAndTypeIdx)>(
+                        readPtr);
             }
 
             DEF_ABS_CHECK_AND_MOVE(AbsDynamic)
@@ -167,14 +189,13 @@ export namespace cp_consts {
             }
 
             template <typename SpecR>
-            NODISCARD static constexpr std::optional<Utf8> parse(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                const auto lengthOpt =
-                        dataPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
+            NODISCARD static constexpr std::optional<Utf8> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                const auto lengthOpt = readPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
                 if (!lengthOpt) [[unlikely]]
                     return std::nullopt;
 
-                uint8_t* strStartPtr = dataPtr.i;
-                if (const size_t length = *lengthOpt; dataPtr.check_and_move(length)) [[likely]] {
+                uint8_t* strStartPtr = readPtr.i;
+                if (const size_t length = *lengthOpt; readPtr.check_and_move(length)) [[likely]] {
                     return std::make_optional(Utf8(std::span{strStartPtr, length}));
                     // ReSharper disable once CppRedundantElseKeywordInsideCompoundStatement
                 } else {
@@ -183,19 +204,17 @@ export namespace cp_consts {
             }
 
             template <typename SpecR>
-            NODISCARD static constexpr bool check_and_move(parser::FileReadPtrBySpec<SpecR>& dataPtr) noexcept {
-                const auto lengthOpt =
-                        dataPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
+            NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                const auto lengthOpt = readPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
                 if (!lengthOpt) [[unlikely]]
                     return false;
                 const size_t length = *lengthOpt;
-                return dataPtr.check_and_move(length);
+                return readPtr.check_and_move(length);
             }
 
-            NODISCARD bool deser(parser::FileWritePtrBySpec<auto>& dataPtr) const noexcept {
-                if (!dataPtr.deser_rev(static_cast<Utf8SizeT>(utf8Info.size()))) [[unlikely]] return false;
-                for (auto i : utf8Info) if (!dataPtr.deser(i)) [[unlikely]] return false;
-                return true;
+            NODISCARD void deser(parser::WritePtrBySpec<auto>& writePtr) const noexcept {
+                writePtr.deser_rev(static_cast<Utf8SizeT>(utf8Info.size()));
+                writePtr.deser_range(utf8Info);
             }
 
             ~Utf8() noexcept {
@@ -217,10 +236,10 @@ export namespace cp_consts {
         };
 
         namespace spec {
-            DEF_ABS_EXT_STRUCT(PrInt, AbsPrimitive<opcodes::java_ts::Int>, CONSTANT_Integer)
-            DEF_ABS_EXT_STRUCT(PrFloat, AbsPrimitive<opcodes::java_ts::Float>, CONSTANT_Float)
-            DEF_ABS_EXT_STRUCT(PrDouble, AbsPrimitive<opcodes::java_ts::Double>, CONSTANT_Double)
-            DEF_ABS_EXT_STRUCT(PrLong, AbsPrimitive<opcodes::java_ts::Long>, CONSTANT_Long)
+            DEF_ABS_EXT_STRUCT(PrInt, AbsPrimitive<parser::wrappers::JInt>, CONSTANT_Integer)
+            DEF_ABS_EXT_STRUCT(PrFloat, AbsPrimitive<parser::wrappers::JFloat>, CONSTANT_Float)
+            DEF_ABS_EXT_STRUCT(PrDouble, AbsPrimitive<parser::wrappers::JDouble>, CONSTANT_Double)
+            DEF_ABS_EXT_STRUCT(PrLong, AbsPrimitive<parser::wrappers::JLong>, CONSTANT_Long)
             DEF_ABS_EXT_STRUCT(FRef, AbsMF, CONSTANT_Fieldref)
             DEF_ABS_EXT_STRUCT(MRef, AbsMF, CONSTANT_Methodref)
             DEF_ABS_EXT_STRUCT(IMRef, AbsMF, CONSTANT_InterfaceMethodref)
@@ -258,8 +277,8 @@ export namespace cp_consts {
                                             Dynamic, Utf8, Fieldref, Methodref, InterfaceMethodref, NameAndType,
                                             InvokeDynamic, Module, Package>;
 
-        using VariantAllUnempt = All::Append<Utf8Custom>;
-        using VariantAll = VariantAllUnempt::Prepend<EmptyVarValue>;
+        using VariantAllUnempty = All::Append<Utf8Custom>;
+        using VariantAll = VariantAllUnempty::Prepend<EmptyVarValue>;
 
         using variant = VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr>;
 
@@ -272,7 +291,7 @@ export namespace cp_consts {
     } // namespace traits
 
     template <typename LambdaRetType>
-    auto swith_tag_id_enum_2compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    auto switch_tag_id_enum_2compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Float, Float);
@@ -297,7 +316,7 @@ export namespace cp_consts {
     }
 
     template <typename LambdaRetType>
-    auto swith_tag_id_enum_1compl_1rt(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    auto switch_tag_id_enum_1compl_1rt(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Float, Float);
@@ -322,7 +341,7 @@ export namespace cp_consts {
     }
 
     template <typename LambdaRetType>
-    auto swith_tag_id_enum_1compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    auto switch_tag_id_enum_1compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Integer);
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Float);
@@ -378,4 +397,4 @@ export namespace cp_consts {
     std::ostream& operator<<(std::ostream& stream, const opcodes::TagIdEnum tagId) {
         return stream << tag_to_str(tagId);
     }
-} // namespace const_i
+} // namespace cp_consts

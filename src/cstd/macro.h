@@ -25,8 +25,8 @@
 #define ALLOCATOR __attribute__((malloc))
 
 #define CSFLAG static constexpr bool
-#define OR_ELSE_OPT_DECLARATED(type, name, opt_value, ...) do { auto timed = opt_value; if (!timed) [[unlikely]] { __VA_ARGS__ }; name = *timed; } while (0)
-#define OR_ELSE_OPT(type, name, opt_value, ...) type name; OR_ELSE_OPT_DECLARATED(type, name, opt_value, __VA_ARGS__)
+#define OR_ELSE_OPT_DECLARED(type, name, opt_value, ...) { auto timed = opt_value; if (!timed) [[unlikely]] { __VA_ARGS__ }; name = *timed; }
+#define OR_ELSE_OPT(type, name, opt_value, ...) type name; OR_ELSE_OPT_DECLARED(type, name, opt_value, __VA_ARGS__)
 #define UNUSED [[maybe_unused]]
 #define DISCARD (void)
 
@@ -40,7 +40,7 @@
 }
 
 #define STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, default_v, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, return default_v;)
-#define STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, static_assert(!requires { _BFC_G::flag; }, "Static bool flag "#flag" is not declarated"))
+#define STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, static_assert(!requires { _BFC_G::flag; }, "Static bool flag "#flag" is not declared"))
 
 #define STATIC_FLAG_CHECK(flag, type, default_v, _BFC_G) STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, default_v, _BFC_G)()
 #define STRICT_STATIC_FLAG_CHECK(flag, type, _BFC_G) STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G)()

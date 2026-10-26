@@ -7,9 +7,11 @@ module;
 
 export module nodes;
 
-import const_i;
+import cp_consts;
 import parser_utils;
 import array_parsers;
+import parser_b2;
+import parser_b1;
 
 export namespace nodes {
     namespace templ {
@@ -17,36 +19,6 @@ export namespace nodes {
             bool useWrite;
             bool handleVersion = false;
             parser::HandleMode handleWrittenCpool, handleWrittenIfaces, handleWrittenField = parser::HandleMode::NONE;
-        };
-
-        template <typename Base>
-        struct JaacCollectionMxn : Base {
-            using Base::T;
-
-            void jaac_reserve(this auto&& self, size_t i) {
-                self.reserve(i);
-            }
-
-            bool jaac_push_back(this auto&& self, auto&& element) {
-                self.push_back(std::forward<decltype(element)>(element));
-                return true;
-            }
-
-            decltype(auto) jaac_at(this auto&& self, size_t i) {
-                return self.at(i);
-            }
-
-            auto jaac_begin(this auto&& self) {
-                return self.begin();
-            }
-
-            auto jaac_end(this auto&& self) {
-                return self.end();
-            }
-
-            auto jaac_size(this auto&& self) {
-                return self.size();
-            }
         };
 
         namespace def {
@@ -65,13 +37,13 @@ export namespace nodes {
             };
 
             template <typename IBase>
-            using DefCpoolCollMxn = CpoolMxn<JaacCollectionMxn<IBase>>;
+            using DefCpoolCollMxn = CpoolMxn<parser::common::JaacCollectionMxn<IBase>>;
 
             struct CpoolRawColl : DefCpoolCollMxn<std::span<uint8_t>> {
                 using DefCpoolCollMxn<std::span<uint8_t>>::DefCpoolCollMxn;
 
                 template <typename SpecR>
-                bool jaac_push_back(this auto&& self, parser::FileReadPtrBySpec<SpecR> element) {
+                bool jaac_push_back(this auto&& self, parser::ReadPtrBySpec<SpecR> element) {
                     self.push_back(element.readSpan());
                     return true;
                 }
@@ -81,16 +53,18 @@ export namespace nodes {
                 using DefCpoolCollMxn<std::vector<cp_consts::traits::variant>>::DefCpoolCollMxn;
 
                 template <typename SpecR>
-                bool jaac_push_back(this auto&& self, parser::FileReadPtrBySpec<SpecR> element) {
+                bool jaac_push_back(this auto&& self, parser::ReadPtrBySpec<SpecR> element) {
                     cp_consts::traits::variant var{};
-                    if (parser::parse1_const<true>(element, [&](const cp_consts::traits::variant& v){ var = v; }) != parser::ParseErr::NONE) [[unlikely]] {
+                    if (parser::parse1_const<true>(element, [&](const cp_consts::traits::variant& v) { var = v; }) !=
+                        parser::ParseErr::NONE) [[unlikely]] {
                         return false;
                     }
                     self.push_back(var);
+                    return true;
                 }
             };
         } // namespace def
-    } // namespace cmp
+    } // namespace templ
 
     namespace full {
         template <templ::ParseFlags parseFlagsG>
@@ -98,7 +72,7 @@ export namespace nodes {
             PUBLIC_V_GENERIC_R(parseFlags)
 
             uint32_t version{};
-            templ::Translator cpool, ifaces, fields;
+            parser::common::Translator cpool, ifaces, fields;
         };
     } // namespace full
 } // namespace nodes

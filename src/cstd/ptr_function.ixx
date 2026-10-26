@@ -33,9 +33,9 @@ namespace cstd {
         template <typename Func> requires isNotSelf<Func>
         explicit constexpr stack_func_base(Func* func) noexcept : vir_f([](void* self, Args... args) -> Ret {
             if constexpr (std::same_as<Ret, void>) {
-                (*static_cast<std::remove_cvref_t<Func>*>(self))(cstd::forward_cpy<Args>(args)...);
+                (*static_cast<std::remove_cvref_t<Func>*>(self))(cstd::forward_from_cpy<Args>(args)...);
             } else {
-                return (*static_cast<std::remove_cvref_t<Func>*>(self))(cstd::forward_cpy<Args>(args)...);
+                return (*static_cast<std::remove_cvref_t<Func>*>(self))(cstd::forward_from_cpy<Args>(args)...);
             } // ReSharper disable once CppNotAllPathsReturnValue
             }), callable(static_cast<void*>(func)) {}
         
