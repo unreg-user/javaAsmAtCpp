@@ -11,6 +11,7 @@ module;
 export module reader;
 
 import simple_cstd;
+import gstd;
 
 export namespace reader {
     namespace mixins {
@@ -113,7 +114,7 @@ export namespace reader {
                 }
             }
 
-            return std::make_optional(RWFileData{file});
+            return std::optional{RWFileData{file}};
         }
     };
 
@@ -121,25 +122,37 @@ export namespace reader {
         CSFLAG CheckMemorySize = true;
     };
 
+    struct UncheckedReadPtrFlagsStruct {
+        CSFLAG CheckMemorySize = false;
+    };
+
     template <typename Sym, typename FlagsStruct = ReadPtrDefaultFlagsStruct>
     struct ReadPtr {
         Sym* i;
         Sym* last;
 
-        explicit ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size - 1) {
+        /*implicit*/ ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size - 1) {
         }
 
-        explicit ReadPtr(std::span<Sym> data) noexcept : i(data.data()), last(data.data() + data.size() - 1) {
-        }
-
-        explicit ReadPtr(const ReadPtr& other) noexcept : i(other.i), last(other.last) {
+        /*implicit*/ ReadPtr(std::span<Sym> data) noexcept : i(data.data()), last(data.data() + data.size() - 1) {
         }
 
         ReadPtr(Sym* i, Sym* last) noexcept : i(i), last(last) {
         }
 
+        ReadPtr(const ReadPtr& other) noexcept : i(other.i), last(other.last) {
+        }
+
+        ReadPtr(ReadPtr&& other) noexcept : i(other.i), last(other.last) {
+        }
+
+        FAKE_TEMPL requires (!FlagsStruct::CheckMemorySize)
+        explicit ReadPtr(Sym* i) noexcept : i(i), last(nullptr) {
+        }
+
         ReadPtr cpyWithSizeSymbols(const size_t size) {
-            assert(i + size <= last);
+            if constexpr (FlagsStruct::CheckMemorySize)
+                assert(i + size <= last);
             return {i, i + size};
         }
 
@@ -150,7 +163,7 @@ export namespace reader {
 
         auto readSpan() {
             assert(i <= last);
-            auto span = std::span<Sym>{i, last - i};
+            auto span = std::span<Sym>{i, static_cast<size_t>(last - i)};
             i = last;
             return span;
         }
@@ -183,9 +196,9 @@ export namespace reader {
             }
 
             if constexpr (std::same_as<Callable, cstd::identify_lambda_t>) {
-                return std::make_optional(std::move(to));
+                return std::optional{std::move(to)};
             } else {
-                return std::make_optional(callable(std::move(to)));
+                return std::optional{callable(std::move(to))};
             }
         }
 
@@ -244,6 +257,7 @@ export namespace reader {
         }
 
         Sym* end() const noexcept {
+            assert(last);
             return last + 1;
         }
 
@@ -252,7 +266,13 @@ export namespace reader {
         }
 
         Sym* cend() const noexcept {
+            assert(last);
             return last + 1;
+        }
+
+        /*implicit*/ operator std::span<Sym>() const noexcept {
+            ReadPtr copy = *this;
+            return copy.readSpan();
         }
     };
 

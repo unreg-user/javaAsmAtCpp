@@ -15,6 +15,7 @@
 #define V_GENERIC_FIELD(name) static constexpr auto name##V = name;
 #define PUBLIC_V_GENERIC(name) V_GENERIC_FIELD(name)
 #define PUBLIC_V_GENERIC_R(name) static constexpr auto name = name##G;
+#define PUBLIC_V_GENERIC_R_AT(path, name) static constexpr auto name = path.name;
 #define UNION_CONSTR(uName, fieldName) uName(decltype(fieldName) fieldName) noexcept : fieldName(fieldName) {};
 #define UNION_CONSTR_EXPLTYPE(uName, fieldType, fieldName) uName(fieldType fieldName) noexcept : fieldName(fieldName) {};
 #define DEL_CPY(tName) \
@@ -30,7 +31,7 @@
 #define UNUSED [[maybe_unused]]
 #define DISCARD (void)
 
-#define ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, ...) [] constexpr noexcept -> type { \
+#define ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, ...) [] () constexpr noexcept -> type { \
     if constexpr ( requires { _BFC_G::flag; } ) { \
         static_assert(std::same_as<std::remove_cvref_t<decltype(_BFC_G::flag)>, type>, "Invalid static flag type "#flag" (expected "#type")"); \
         return _BFC_G::flag; \
@@ -40,10 +41,24 @@
 }
 
 #define STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, default_v, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, return default_v;)
-#define STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, static_assert(!requires { _BFC_G::flag; }, "Static bool flag "#flag" is not declared"))
+#define STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G) ABS_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G, static_assert(!requires { _BFC_G::flag; }, "Static bool flag "#flag" is not declared"); return {} )
 
 #define STATIC_FLAG_CHECK(flag, type, default_v, _BFC_G) STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, default_v, _BFC_G)()
 #define STRICT_STATIC_FLAG_CHECK(flag, type, _BFC_G) STRICT_STATIC_FLAG_CHECKER_LAMBDA_WITH_TYPE(flag, type, _BFC_G)()
+
+#define FIELD_ARG(name) decltype(name) name
+#define ARG_FIELD(name) name(name)
+
+// I hate ISO
+#define CPP_KOSTYL
+
+#define REVAL(val)  std::declval<decltype(val)>()
+
+#define FAKE_TEMPL CPP_KOSTYL template <bool = true>
+
+CPP_KOSTYL // that it is not kw
+#define COM static constexpr
+#define REQ_REQ(...) requires { requires __VA_ARGS__; }
 
 /*
 #include <utility>

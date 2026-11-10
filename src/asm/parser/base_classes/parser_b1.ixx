@@ -10,22 +10,23 @@ export module parser_b1;
 import read_utils;
 import parser_utils;
 import simple_cstd;
+import gstd;
 
 export namespace parser::common {
     struct Translator {
     protected:
-        uint8_t* source_first = nullptr;
-        uint8_t* source_last = nullptr;
+        u8_ptr source_first = nullptr;
+        u8_ptr source_last = nullptr;
         size_t source_size = 0;
 
     public:
         constexpr Translator() noexcept = default;
 
-        constexpr void jaac_set_source_data_interval_first(uint8_t* pos) noexcept {
+        constexpr void jaac_set_source_data_interval_first(u8_ptr pos) noexcept {
             source_first = pos;
         }
 
-        constexpr void jaac_set_source_data_interval_last(uint8_t* pos) noexcept {
+        constexpr void jaac_set_source_data_interval_last(u8_ptr pos) noexcept {
             source_last = pos;
         }
 
@@ -46,34 +47,49 @@ export namespace parser::common {
         }
     };
 
-    template <typename Base>
-    struct JaacIterableMxn : Base {
-        using Base::Base;
-
-        auto jaac_begin(this auto&& self) {
+    struct JaacIterablePMxn {
+        decltype(auto) jaac_begin(this auto&& self) {
             return self.begin();
         }
 
-        auto jaac_end(this auto&& self) {
+        decltype(auto) jaac_end(this auto&& self) {
             return self.end();
         }
     };
 
-    template <typename IBase>
-    struct JaacCollectionMxn : JaacIterableMxn<IBase> {
-        using JaacIterableMxn<IBase>::JaacIterableMxn;
+    struct JaacSpanPMxn : JaacIterablePMxn {
+        decltype(auto) jaac_size(this auto&& self) {
+            return self.size();
+        }
+    };
 
+    struct JaacVectorPMxn : JaacSpanPMxn {
         void jaac_reserve(this auto&& self, size_t i) {
             self.reserve(i);
         }
 
-        gstd::true_void jaac_push_back(this auto&& self, auto&& element) {
-            self.push_back(std::forward<decltype(element)>(element));
+        template <typename Element>
+        gstd::true_void jaac_push_back(this auto&& self, Element&& element) {
+            self.push_back(std::forward<Element>(element));
             return {};
         }
 
-        auto jaac_size(this auto&& self) {
-            return self.size();
+        template <typename Element>
+        gstd::true_void jaac_emplace_back(this auto&& self, Element&& element) {
+            self.emplace_back(std::forward<Element>(element));
+            return {};
+        }
+    };
+
+    struct HasParseSizePMxn {
+        size_t parse_size = 0;
+
+        NODISCARD size_t jaac_get_parse_size() const noexcept {
+            return parse_size;
+        }
+
+        void jaac_set_parse_size(const size_t size) noexcept {
+            parse_size = size;
         }
     };
 } // namespace parser::common

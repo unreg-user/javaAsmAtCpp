@@ -33,6 +33,7 @@ target_sources(javaAsmAtCpp
         src/cstd/macro.h
         src/cstd/macro_dstd.h
         src/cstd/costd_mcr.h
+        src/cstd/gstd_mcr.h
         src/asm/impl_base/nodes/nodes_macro.h
 
         PUBLIC FILE_SET CXX_MODULES FILES

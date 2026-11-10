@@ -1,8 +1,7 @@
 module;
 
-#include <span>
-#include <string>
-#include <vector>
+#include <variant>
+
 #include "../../../cstd/macro.h"
 
 export module nodes;
@@ -12,67 +11,74 @@ import parser_utils;
 import array_parsers;
 import parser_b2;
 import parser_b1;
+import simple_cstd;
+import parser_utils;
+import gstd;
 
 export namespace nodes {
     namespace templ {
-        struct ParseFlags {
+        struct ParseFlags { // NOLINT(*-pro-type-member-init)
             bool useWrite;
-            bool handleVersion = false;
-            parser::HandleMode handleWrittenCpool, handleWrittenIfaces, handleWrittenField = parser::HandleMode::NONE;
+            bool handleVersion, handleAccess, deepHandleThisClassIdx, handleSuperClassIdx = false;
+            bool parseCpoolStructure = false;
+            parser::HandleMode handleModeCpool, handleModeIfaces, handleModeFields, handleModeAttrs = parser::HandleMode::NONE;
+            parser::ParseLength parseLength = parser::ParseLength::FULL;
+        };
+
+        template <ParseFlags parseFlags>
+        struct ClearClassN {
+            PUBLIC_V_GENERIC_R_AT(parseFlags, useWrite)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleVersion)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleAccess)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, deepHandleThisClassIdx)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleSuperClassIdx)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeCpool)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeIfaces)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeFields)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeAttrs)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, parseCpoolStructure)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, parseLength)
         };
 
         namespace def {
+            using namespace parser;
+            using namespace common;
+            using namespace cp_consts::traits;
+
+            struct JaacCpoolCollectionPMxn : JaacVectorPMxn, HasParseSizePMxn {};
+
             template <typename Base>
-            struct CpoolMxn : Base {
-                using Base::T;
-                cp_consts::SizeT parse_size = 0;
+            using MakeHasParseSize = cstd::ApplyP<Base, HasParseSizePMxn>;
 
-                NODISCARD size_t jaac_get_parse_size() const {
-                    return parse_size;
-                }
+            using CpoolRawColl = JaacVector<RawJaacSpan<>>;
 
-                void jaac_set_parse_size(const size_t size) {
-                    parse_size = size;
-                }
-            };
+            using CpoolParsedColl = JaacVector<cp_var>;
 
-            template <typename IBase>
-            using DefCpoolCollMxn = CpoolMxn<parser::common::JaacCollectionMxn<IBase>>;
+            struct CpoolAndRawVar : std::variant<cp_var, RawAnyJaacSpan<>> {
+            private:
+                using Base = std::variant<cp_var, RawAnyJaacSpan<>>;
 
-            struct CpoolRawColl : DefCpoolCollMxn<std::span<uint8_t>> {
-                using DefCpoolCollMxn<std::span<uint8_t>>::DefCpoolCollMxn;
+            public:
+                /*implicit*/ constexpr CpoolAndRawVar(cp_var var) noexcept : Base(var) {}
+                /*implicit*/ constexpr CpoolAndRawVar(RawAnyJaacSpan<> span) noexcept : Base(span) {}
 
-                template <typename SpecR>
-                bool jaac_push_back(this auto&& self, parser::ReadPtrBySpec<SpecR> element) {
-                    self.push_back(element.readSpan());
-                    return true;
+                template <typename SpecW>
+                NODISCARD gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+                    std::visit([&writePtr](auto self) {
+                        self.deser(writePtr);
+                    }, *this);
+                    return {};
                 }
             };
 
-            struct CpoolParsedColl : DefCpoolCollMxn<std::vector<cp_consts::traits::variant>> {
-                using DefCpoolCollMxn<std::vector<cp_consts::traits::variant>>::DefCpoolCollMxn;
-
-                template <typename SpecR>
-                bool jaac_push_back(this auto&& self, parser::ReadPtrBySpec<SpecR> element) {
-                    cp_consts::traits::variant var{};
-                    if (parser::parse1_const<true>(element, [&](const cp_consts::traits::variant& v) { var = v; }) !=
-                        parser::ParseErr::NONE) [[unlikely]] {
-                        return false;
-                    }
-                    self.push_back(var);
-                    return true;
-                }
-            };
+            using CpoolHalfParsedColl = JaacVector<CpoolAndRawVar>;
         } // namespace def
     } // namespace templ
 
     namespace full {
-        template <templ::ParseFlags parseFlagsG>
-        struct ClassN {
-            PUBLIC_V_GENERIC_R(parseFlags)
-
-            uint32_t version{};
-            parser::common::Translator cpool, ifaces, fields;
+        template <templ::ParseFlags parseFlags>
+        struct EmptyClassN : templ::ClearClassN<parseFlags> {
+            parser::common::Translator cpool, ifaces, fields, methods, attrs;
         };
     } // namespace full
 } // namespace nodes

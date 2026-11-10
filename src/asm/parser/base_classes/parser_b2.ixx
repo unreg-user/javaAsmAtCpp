@@ -3,238 +3,558 @@ module;
 #include <optional>
 #include <span>
 #include <tuple>
+#include <vector>
+
 #include "../../../cstd/macro.h"
 
 export module parser_b2;
 
-import array_parsers;
 import parser_b1;
 import parser_concepts;
 import read_utils;
 import parser_utils;
 import simple_cstd;
 import parser_wrappers_b2;
+import cstd_variant;
+import gstd;
 
 export namespace parser::common {
-    namespace internal_bases {
-        template <typename Base, typename... Types>
-        struct SerCombinatorMxnForMxn : Base {
-            using Base::Base;
-
-            template <typename SpecR>
-                requires(... && JaacParsable<Types, SpecR>)
-            NODISCARD static std::optional<SerCombinatorMxnForMxn> parse(ReadPtrBySpec<SpecR>& readPtr) {
-                std::tuple<std::optional<Types>...> parsedTuple{Types::template parse(readPtr)...};
-                return std::apply([](auto&&... parsed) { return (... && parsed); }, parsedTuple)
-                               ? std::apply(
-                                         [](auto&&... parsed) {
-                                             return std::make_optional(SerCombinatorMxnForMxn{(*parsed)...});
-                                         },
-                                         std::move(parsedTuple))
-                               : std::nullopt;
+    template <typename Self, typename... Types>
+    struct SerCombinatorPMxn {
+        template <typename SpecR>
+            requires(... && JaacParsable<Types, SpecR>)
+        NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            if (auto parsedTuple = std::tuple{Types::parse(readPtr)...};
+                !std::apply([](auto&&... parsed) { return (... && parsed); }, parsedTuple)) [[unlikely]] {
+                return std::nullopt;
+            } else {
+                return std::apply(
+                        []<typename... Parsed>(Parsed&&... parsed) -> std::optional<Self> {
+                            return std::optional<Self>{std::in_place, (*std::forward<Parsed>(parsed))...};
+                        },
+                        std::move(parsedTuple));
             }
+        }
 
-            template <typename SpecR>
-                requires(... && JaacParsable<Types, SpecR>)
-            NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
-                return (... && Types::template check_and_move(readPtr));
-            }
-        };
+        template <typename SpecR>
+            requires(... && JaacParsable<Types, SpecR>)
+        NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            return (... && Types::check_and_move(readPtr));
+        }
+    };
 
-        template <typename Base, typename PrefieldsSt>
-        struct AddPrefieldsMxn : PrefieldsSt, Base {
-        private:
-            using Base2 = PrefieldsSt;
-
-            AddPrefieldsMxn(PrefieldsSt prefieldsStruct, Base base) : Base2(prefieldsStruct), Base(base) {
-            }
-
-        public:
-            using Base::Base;
-
+    namespace internal {
+        template <typename Base, typename PrefieldsSt, typename Self>
+        struct AddPrefieldsWMxnMethodsPart {
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PrefieldsSt, SpecR>
-            NODISCARD static std::optional<AddPrefieldsMxn> parse(ReadPtrBySpec<SpecR>& readPtr) {
-                std::optional<PrefieldsSt> prefSt = PrefieldsSt::parse(readPtr);
-                std::optional<Base> base = Base::parse(readPtr);
-                return prefSt && base ? std::make_optional(AddPrefieldsMxn{*prefSt, *base}) : std::nullopt;
+            NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                auto prefSt = PrefieldsSt::parse(readPtr);
+                auto base = Base::parse(readPtr);
+                if (!(prefSt && base)) [[unlikely]] {
+                    return std::nullopt;
+                }
+                return std::optional{Self{*prefSt, *base}};
             }
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PrefieldsSt, SpecR>
-            NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+            NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 return PrefieldsSt::check_and_move(readPtr) && Base::check_and_move(readPtr);
             }
 
             template <typename SpecW>
                 requires JaacDeserable<Base, SpecW> && JaacDeserable<PrefieldsSt, SpecW>
-            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
+            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
                 return static_cast<PrefieldsSt>(*this).deser(writePtr) && static_cast<Base>(*this).deser(writePtr);
             }
         };
+    } // namespace internal
 
-        template <typename Base, typename PostfieldsSt>
-        struct AddPostfieldsMxn : Base, PostfieldsSt {
-        private:
-            using Base2 = PostfieldsSt;
+    template <typename Base, typename PrefieldsSt>
+    struct AddPrefieldsWMxn
+        : PrefieldsSt,
+          Base,
+          internal::AddPrefieldsWMxnMethodsPart<Base, PrefieldsSt, AddPrefieldsWMxn<Base, PrefieldsSt>> {
+    private:
+        using Base2 = PrefieldsSt;
+        using Base3 = internal::AddPrefieldsWMxnMethodsPart<Base, PrefieldsSt, AddPrefieldsWMxn>;
+        friend Base3;
 
-            AddPostfieldsMxn(Base base, PostfieldsSt prefieldsStruct) : Base(base), Base2(prefieldsStruct) {
+        constexpr AddPrefieldsWMxn(PrefieldsSt prefieldsStruct, Base base) noexcept :
+            Base2(prefieldsStruct), Base(base) {
+        }
+
+    public:
+        using Base::Base;
+
+        using Base3::check_and_move;
+        using Base3::deser;
+        using Base3::parse;
+    };
+
+    namespace internal {
+        template <typename Base, typename PostfieldsSt, typename Self>
+        struct AddPostfieldsWMxnMethodsPart {
+            template <typename SpecR>
+                requires JaacParsable<Base, SpecR> && JaacParsable<PostfieldsSt, SpecR>
+            NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                /*opt<Base>*/ auto base = Base::parse(readPtr);
+                /*opt<PostfieldsSt>*/ auto postSt = PostfieldsSt::parse(readPtr);
+                if (!(base && postSt)) [[unlikely]]
+                    return std::nullopt;
+                return std::optional{Self{*base, *postSt}};
             }
-
-        public:
-            using Base::Base;
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PostfieldsSt, SpecR>
-            NODISCARD static std::optional<AddPostfieldsMxn> parse(ReadPtrBySpec<SpecR>& readPtr) {
-                std::optional<Base> base = Base::parse(readPtr);
-                std::optional<PostfieldsSt> postSt = PostfieldsSt::parse(readPtr);
-                return base && postSt ? std::make_optional(AddPostfieldsMxn{*base, *postSt}) : std::nullopt;
-            }
-
-            template <typename SpecR>
-                requires JaacParsable<Base, SpecR> && JaacParsable<PostfieldsSt, SpecR>
-            NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+            NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                // const bool b1 = PostfieldsSt::check_and_move(readPtr);
+                // const bool b2 = Base::check_and_move(readPtr);
+                // const bool ret_val = /**/ b1 && b2;
                 return Base::check_and_move(readPtr) && PostfieldsSt::check_and_move(readPtr);
             }
 
             template <typename SpecW>
                 requires JaacDeserable<Base, SpecW> && JaacDeserable<PostfieldsSt, SpecW>
-            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
+            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
                 return static_cast<Base>(*this).deser(writePtr) && static_cast<PostfieldsSt>(*this).deser(writePtr);
             }
         };
-    } // namespace internal_bases
+    } // namespace internal
 
-    template <typename ElType, typename SizeT = ArraySizeT>
-    struct JaacSpan : std::span<ElType> {
-        using std::span<ElType>::span;
+    template <typename Base, typename PostfieldsSt>
+    struct AddPostfieldsWMxn
+        : Base,
+          PostfieldsSt,
+          internal::AddPostfieldsWMxnMethodsPart<Base, PostfieldsSt, AddPostfieldsWMxn<Base, PostfieldsSt>> {
+    private:
+        using Base2 = PostfieldsSt;
+        using Base3 = internal::AddPostfieldsWMxnMethodsPart<Base, PostfieldsSt, AddPostfieldsWMxn>;
+        friend Base3;
+
+        constexpr AddPostfieldsWMxn(Base base, PostfieldsSt prefieldsStruct) noexcept :
+            Base(base), Base2(prefieldsStruct), Base3() {
+        }
+
+    public:
+        using Base::Base;
+
+        using Base3::check_and_move;
+        using Base3::deser;
+        using Base3::parse;
+    };
+
+    template <typename ElemT, typename SizeT = wrappers::ArraySizeT>
+    struct JaacSpan : std::span<ElemT>, JaacSpanPMxn {
+        using std::span<ElemT>::span;
 
         template <typename SpecW>
-            requires JaacDeserable<ElType, SpecW> && JaacDeserable<ElType, SizeT>
-        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
-            if (!static_cast<SizeT>(this->size()).deser(writePtr))
+            requires JaacDeserable<ElemT, SpecW> && JaacDeserable<ElemT, SizeT>
+        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+            if (!static_cast<SizeT>(this->size()).deser(writePtr)) [[unlikely]]
                 return false;
             for (auto& i : *this)
-                if (!i.deser(writePtr))
+                if (!i.deser(writePtr)) [[unlikely]]
                     return false;
             return true;
         }
     };
 
-    template <typename RawElType, typename SizeT = ArraySizeT>
-    struct RawJaacSpan : std::span<RawElType> {
-        using std::span<RawElType>::span;
+    template <typename RawElemT = uint8_t, typename SizeT = wrappers::ArraySizeT>
+    struct RawAnyJaacSpan : std::span<RawElemT>, JaacSpanPMxn {
+        using std::span<RawElemT>::span;
+
+        /*implicit*/ RawAnyJaacSpan(std::span<RawElemT> span) noexcept : std::span<RawElemT>(span) {
+        }
+
+        template <typename SpecW>
+            requires JaacDeserable<RawElemT, SpecW> && JaacDeserable<RawElemT, SizeT>
+        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+            if (!static_cast<SizeT>(this->size()).deser(writePtr)) [[unlikely]]
+                return false;
+
+            writePtr.deser_range(*this);
+
+            return true;
+        }
+    };
+
+    struct JaacVectorTySettings {
+        bool isIndepPref = true;
+    };
+
+    template <typename ElemT, typename SizeT = wrappers::ArraySizeT, JaacVectorTySettings settings = {}>
+    struct JaacVector : std::vector<ElemT>, JaacVectorPMxn {
+        using std::vector<ElemT>::vector;
 
         template <typename SpecR>
-            requires JaacParsable<ArraySizeT, SpecR>
-        NODISCARD static std::optional<RawJaacSpan> parse(ReadPtrBySpec<SpecR>& readPtr) {
-            std::optional<SizeT> sizeOpt = SizeT::template parse(readPtr);
-            if (!sizeOpt)
+            requires JaacParsable<SizeT, SpecR> && JaacParsable<ElemT, SpecR>
+        NODISCARD static std::optional<JaacVector> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
+            if (!sizeOpt) [[unlikely]]
                 return std::nullopt;
             const auto size = static_cast<size_t>(*sizeOpt);
 
-            auto first = readPtr.i;
-            if (!readPtr.check_and_move(sizeof(RawElType) * size))
-                return std::nullopt;
+            JaacVector self{};
+            self.reserve(size);
 
-            return std::make_optional(RawJaacSpan{first, size});
+            for (size_t i = 0; i < size; ++i) {
+                /*opt<ElemT>*/ auto j = ElemT::parse(readPtr);
+                if (!j) [[unlikely]]
+                    return std::nullopt;
+                self.emplace_back(std::move(*j));
+            }
+
+            return std::optional{self};
         }
 
         template <typename SpecR>
-            requires JaacParsable<ArraySizeT, SpecR>
-        NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
-            std::optional<SizeT> sizeOpt = SizeT::template parse(readPtr);
-            if (!sizeOpt)
+            requires JaacParsable<SizeT, SpecR> && JaacParsable<ElemT, SpecR>
+        NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
+            if (!sizeOpt) [[unlikely]]
                 return false;
             const auto size = static_cast<size_t>(*sizeOpt);
 
             auto first = readPtr.i;
-            if (!readPtr.check_and_move(sizeof(RawElType) * size))
+
+            for (size_t i = 0; i < size; ++i) {
+                if (!ElemT::check_and_move(readPtr)) [[unlikely]]
+                    return false;
+            }
+
+            return true;
+        }
+
+        template <typename SpecW, typename Self>
+            requires JaacDeserable<SizeT, SpecW> && JaacDeserable<ElemT, SpecW> &&
+                     (settings.isIndepPref || JaacInCollectionDeserable<ElemT, std::remove_cvref_t<Self>, SpecW>)
+        NODISCARD bool deser(this Self&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+            if (!static_cast<SizeT>(self.size()).deser(writePtr)) [[unlikely]]
+                return false;
+
+            for (auto& i : self) {
+                if (!i.deser(writePtr)) [[unlikely]]
+                    return false;
+            }
+
+            return true;
+        }
+
+        template <typename SpecW, typename Self>
+            requires JaacDeserable<SizeT, SpecW> &&
+                     JaacInCollectionDeserable<ElemT, std::remove_cvref_t<Self>, SpecW> &&
+                     (!settings.isIndepPref || JaacInCollectionDeserable<ElemT, std::remove_cvref_t<Self>, SpecW>)
+        NODISCARD bool deser(this Self&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+            auto size = self.size();
+
+            if (!static_cast<SizeT>(size).deser(writePtr)) [[unlikely]]
+                return false;
+
+            for (size_t i = 0; i < size; ++i) {
+                if (!self[i].deser(writePtr, i, self)) [[unlikely]]
+                    return false;
+            }
+
+            return true;
+        }
+    };
+
+    template <typename RawElemT = uint8_t, typename SizeT = wrappers::ArraySizeT>
+    struct RawJaacSpan : JaacSpanPMxn {
+        u8_ptr sizePtr;
+
+        explicit constexpr RawJaacSpan(const u8_ptr sizePtr) noexcept : sizePtr(sizePtr) { // NOLINT(*-misplaced-const)
+        }
+
+        NODISCARD UncheckedReadPtr get_size_read_ptr() const noexcept {
+            return UncheckedReadPtr{sizePtr};
+        }
+
+        NODISCARD UncheckedReadPtr get_after_size_read_ptr() const noexcept {
+            auto readPtr = get_size_read_ptr();
+            SizeT::parse(readPtr);
+            return readPtr;
+        }
+
+        NODISCARD u8_ptr get_after_size_ptr() const noexcept {
+            return get_after_size_read_ptr().i;
+        }
+
+        NODISCARD u8_ptr get_end_ptr() const noexcept {
+            auto readPtr = get_size_read_ptr();
+            const auto size = static_cast<size_t>(*SizeT::parse(readPtr));
+            DISCARD readPtr.check_and_move(sizeof(RawElemT) * size);
+            return readPtr.i;
+        }
+
+        NODISCARD u8_ptr get_last_sym_ptr() const noexcept {
+            return --get_end_ptr();
+        }
+
+        NODISCARD SizeT typed_size() const noexcept {
+            return *SizeT::parse(get_size_read_ptr());
+        }
+
+        NODISCARD size_t size() const noexcept {
+            return static_cast<size_t>(typed_size());
+        }
+
+        NODISCARD u8_ptr begin() const noexcept {
+            return get_after_size_ptr();
+        }
+
+        NODISCARD u8_ptr end() const noexcept {
+            return get_end_ptr();
+        }
+
+        NODISCARD u8_ptr cbegin() const noexcept {
+            return begin();
+        }
+
+        NODISCARD u8_ptr cend() const noexcept {
+            return end();
+        }
+
+        template <typename SpecR>
+            requires JaacParsable<SizeT, SpecR>
+        NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
+            if (!sizeOpt) [[unlikely]]
+                return false;
+
+            if (!readPtr.check_and_move(sizeof(RawElemT) * static_cast<size_t>(*sizeOpt))) [[unlikely]]
+                return false;
+
+            return true;
+        }
+
+        template <typename SpecR>
+            requires JaacParsable<SizeT, SpecR>
+        NODISCARD static std::optional<RawJaacSpan> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            auto sizePtr = readPtr.i;
+            if (!check_and_move(readPtr)) [[unlikely]]
+                return std::nullopt;
+            return std::optional{RawJaacSpan{sizePtr}};
+        }
+
+        template <typename SpecW>
+            requires JaacDeserable<SizeT, SpecW>
+        NODISCARD gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) const noexcept {
+            writePtr.deser_range(UncheckedReadPtr{get_after_size_ptr(), get_last_sym_ptr()});
+            return {};
+        }
+    };
+
+    template <typename RawElemT = uint8_t, typename SizeT = ArrayRSizeT>
+    struct RawFullCachedJaacSpan : JaacSpanPMxn {
+        u8_ptr dataBegin = nullptr;
+        u8_ptr dataEnd = nullptr;
+        u8_ptr sizePtr = nullptr;
+        SizeT typedSize{};
+
+        constexpr RawFullCachedJaacSpan(const u8_ptr begin, // NOLINT(*-pro-type-member-init, *-misplaced-const)
+                                        const u8_ptr end, // NOLINT(*-pro-type-member-init, *-misplaced-const)
+                                        const u8_ptr sizePtr, // NOLINT(*-pro-type-member-init, *-misplaced-const)
+                                        SizeT size) noexcept :
+            dataBegin(begin), dataEnd(end), sizePtr(sizePtr), typedSize(size) {
+        }
+
+        constexpr RawFullCachedJaacSpan() noexcept = default;
+
+        template <typename SpecR>
+            requires JaacParsable<SizeT, SpecR>
+        NODISCARD static std::optional<RawFullCachedJaacSpan> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            auto sizePtr = readPtr.i;
+            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
+            if (!sizeOpt) [[unlikely]]
+                return std::nullopt;
+            SizeT typedSize = *sizeOpt;
+            const auto size = static_cast<size_t>(typedSize);
+
+            u8_ptr first = readPtr.i;
+            if (!readPtr.check_and_move(sizeof(RawElemT) * size)) [[unlikely]]
+                return std::nullopt;
+
+            return std::optional{RawFullCachedJaacSpan{first, readPtr.i, sizePtr, typedSize}};
+        }
+
+        template <typename SpecR>
+            requires JaacParsable<SizeT, SpecR>
+        NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
+            if (!sizeOpt) [[unlikely]]
+                return false;
+
+            if (!readPtr.check_and_move(sizeof(RawElemT) * static_cast<size_t>(*sizeOpt))) [[unlikely]]
                 return false;
 
             return true;
         }
 
         template <typename SpecW>
-            requires JaacDeserable<ArraySizeT, SpecW>
-        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
-            if (!static_cast<SizeT>(this->size()).deser(writePtr))
+            requires JaacDeserable<SizeT, SpecW>
+        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+            if (!typedSize.deser(writePtr)) [[unlikely]]
                 return false;
             writePtr.deser_range(*this);
             return true;
         }
+
+        NODISCARD SizeT typed_size() const noexcept {
+            return typedSize;
+        }
+
+        NODISCARD size_t size() const noexcept {
+            return static_cast<size_t>(typedSize);
+        }
+
+        NODISCARD u8_ptr begin() const noexcept {
+            return dataBegin;
+        }
+
+        NODISCARD u8_ptr end() const noexcept {
+            return dataEnd;
+        }
+
+        NODISCARD u8_ptr cbegin() const noexcept {
+            return begin();
+        }
+
+        NODISCARD u8_ptr cend() const noexcept {
+            return end();
+        }
+
+        /*implicit*/ operator RawJaacSpan<RawElemT, SizeT>() noexcept {
+            return RawJaacSpan<RawElemT, SizeT>{sizePtr};
+        }
     };
 
-    namespace aliases {
-        template <K2 Cont>
-        using ApplyAttrsGsToSpan = Cont</*el*/ uint8_t, /*size_t*/ ArraySizeT>;
-
-        using RawAttrsSpan = ApplyAttrsGsToSpan<RawJaacSpan>;
-
-        template <KN Container, typename... Types>
-        using ApplyCombineSerrMxnForBy = internal_bases::SerCombinatorMxnForMxn<Container<Types...>, Types...>;
-    } // namespace aliases
-
-    namespace internal_bases {
+    namespace internal {
         template <typename AttrsSpan>
-        struct AttrsCont0 : AttrsSpan {
-            using AttrsSpan::AttrsSpan;
-
-        protected:
-            explicit AttrsCont0(AttrsSpan& span) : AttrsSpan(span) {}
-            explicit AttrsCont0(AttrsSpan&& span) : AttrsSpan(std::move(span)) {}
-            explicit AttrsCont0(AttrsSpan span) : AttrsSpan(span) {}
-        public:
-
-            wrappers::CpoolIdx attr_name_idx{};
-
+        struct FullAttributeMethodsPart {
             template <typename SpecW>
                 requires JaacDeserable<AttrsSpan, SpecW>
-            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
-                return attr_name_idx.deser(writePtr) && static_cast<AttrsSpan>(*this).deser(writePtr);
+            NODISCARD bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                return self.attrNameIdx.deser(writePtr) && static_cast<AttrsSpan>(*self).deser(writePtr);
             }
         };
+    } // namespace internal
 
-        template <typename AttrsCont>
-        struct AttrsComponent0 {
-            AttrsCont attrs;
+    template <typename AttrsSpan = RawJaacSpan<uint8_t, wrappers::AttrsSizeT>>
+    struct FullAttribute;
 
+    using DefVeryFullAttribute = FullAttribute<RawFullCachedJaacSpan<uint8_t, wrappers::AttrsSizeT>>;
+
+    template <typename AttrsSpan = RawJaacSpan<uint8_t, wrappers::AttrsSizeT>>
+    struct FullAttribute : AttrsSpan,
+                           SerCombinatorPMxn<FullAttribute<AttrsSpan>, wrappers::CpoolSizeT, AttrsSpan>,
+                           internal::FullAttributeMethodsPart<AttrsSpan> {
+        using AttrsSpan::AttrsSpan;
+
+        wrappers::CpoolSizeT attrNameIdx{};
+
+        constexpr FullAttribute(const wrappers::CpoolSizeT name, AttrsSpan& span) noexcept :
+            AttrsSpan(span), attrNameIdx(name) {
+        }
+
+        constexpr FullAttribute(const wrappers::CpoolSizeT name, AttrsSpan&& span) noexcept :
+            AttrsSpan(std::move(span)), attrNameIdx(name) {
+        }
+
+        /*implicit*/ constexpr FullAttribute(DefVeryFullAttribute& veryFull)
+            requires(!std::same_as<FullAttribute, DefVeryFullAttribute>)
+            : AttrsSpan(veryFull), attrNameIdx(veryFull.attrNameIdx) {
+        }
+        /*implicit*/ constexpr FullAttribute(DefVeryFullAttribute&& veryFull)
+            requires(!std::same_as<FullAttribute, DefVeryFullAttribute>)
+            : AttrsSpan(veryFull), attrNameIdx(veryFull.attrNameIdx) {
+        }
+
+    private:
+        using Base3 = internal::FullAttributeMethodsPart<AttrsSpan>;
+
+    public:
+        using Base3::deser;
+        using SerCombinatorPMxn<FullAttribute, wrappers::CpoolSizeT, AttrsSpan>::parse;
+        using SerCombinatorPMxn<FullAttribute, wrappers::CpoolSizeT, AttrsSpan>::check_and_move;
+    };
+
+    using DefAttrsCont = JaacVector<FullAttribute<>>;
+
+    template <typename AttrsCont = DefAttrsCont>
+    struct AttrsComponent : SerCombinatorPMxn<AttrsComponent<AttrsCont>, AttrsCont> {
+        AttrsCont attrs{};
+
+        explicit constexpr AttrsComponent(AttrsCont& attrs) noexcept : attrs(attrs) {
+        }
+
+        explicit constexpr AttrsComponent(AttrsCont&& attrs) noexcept : attrs(std::move(attrs)) {
+        }
+
+        constexpr AttrsComponent() noexcept = default;
+
+        template <typename SpecW>
+            requires JaacDeserable<AttrsCont, SpecW>
+        NODISCARD bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+            return self.attrs.deser(writePtr);
+        }
+
+        using SerCombinatorPMxn<AttrsComponent, AttrsCont>::parse;
+        using SerCombinatorPMxn<AttrsComponent, AttrsCont>::check_and_move;
+    };
+
+    template <typename Base, typename AttrsCont = DefAttrsCont>
+    using HasAttrWMxn = AddPostfieldsWMxn<Base, AttrsComponent<AttrsCont>>;
+
+    namespace internal {
+        struct MFInfoNoattrDeserPart {
             template <typename SpecW>
-                requires JaacDeserable<AttrsCont, SpecW>
-            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
-                return attrs.deser(writePtr);
+            NODISCARD bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                return self.accessFlags.deser(writePtr) && self.nameIdx.deser(writePtr) &&
+                       self.descriptorIdx.deser(writePtr);
             }
         };
-    } // namespace internal_bases
+    } // namespace internal
 
-    namespace aliases {
-        template <typename AttrsSpan = RawAttrsSpan>
-        using AttrsCont = ApplyCombineSerrMxnForBy<internal_bases::AttrsCont0, AttrsSpan>;
+    struct MFInfoNoattr
+        : SerCombinatorPMxn<MFInfoNoattr, wrappers::AccessFlags, wrappers::CpoolSizeT, wrappers::CpoolSizeT>,
+          internal::MFInfoNoattrDeserPart {
+        wrappers::AccessFlags accessFlags{};
+        wrappers::CpoolSizeT nameIdx{}, descriptorIdx{};
 
-        template <typename AttrsCont = AttrsCont>
-        using AttrsComponent = internal_bases::SerCombinatorMxnForMxn<internal_bases::AttrsComponent0<AttrsCont>, AttrsCont>;
+        constexpr MFInfoNoattr(const wrappers::AccessFlags accessFlags, const wrappers::CpoolSizeT nameIdx,
+                               const wrappers::CpoolSizeT descriptorIdx) noexcept :
+            accessFlags(accessFlags), nameIdx(nameIdx), descriptorIdx(descriptorIdx) {
+        }
 
-        template <typename Base, typename AttrsComp = AttrsComponent>
-        using HasAttrInfoMxn = internal_bases::AddPostfieldsMxn<Base, AttrsComp>;
-    } // namespace aliases
+        constexpr MFInfoNoattr() noexcept = default;
 
-    namespace internal_bases {
-        struct FieldInfo0 { // NOLINT(*-pro-type-member-init)
-            wrappers::AccessFlags access_flags;
-            wrappers::CpoolIdx name_idx, descriptor_idx;
-            
-            template <typename SpecW>
-            NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) {
-                return access_flags.deser(writePtr) && name_idx.deser(writePtr) && descriptor_idx.deser(writePtr);
-            }
-        };
-        
-        using FieldInfo0FullNoattr = SerCombinatorMxnForMxn<FieldInfo0, wrappers::AccessFlags, wrappers::CpoolIdx, wrappers::CpoolIdx>;
-    }
-    
-    namespace aliases {
-        template <typename AttrsComp = AttrsComponent>
-        using FieldInfo = HasAttrInfoMxn<internal_bases::FieldInfo0FullNoattr, AttrsComp>;
-    }
+        using MFInfoNoattrDeserPart::deser;
+        using SerCombinatorPMxn::check_and_move;
+        using SerCombinatorPMxn::parse;
+    };
+
+    template <typename AttrsCont = DefAttrsCont>
+    using MFInfo = HasAttrWMxn<MFInfoNoattr, AttrsCont>;
 } // namespace parser::common
+
+export namespace parser::wrappers {
+    using SVersionNumber = Number<uint16_t>;
+
+    struct VersionNumber : common::SerCombinatorPMxn<VersionNumber, SVersionNumber, SVersionNumber> {
+        SVersionNumber minor{}, major{};
+
+        constexpr VersionNumber(const SVersionNumber minor, const SVersionNumber major) noexcept :
+            minor(minor), major(major) {
+        }
+
+        constexpr VersionNumber() noexcept = default;
+
+        template <typename SpecW>
+        NODISCARD bool deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+            return minor.deser(writePtr) && major.deser(writePtr);
+        }
+    };
+} // namespace parser::wrappers

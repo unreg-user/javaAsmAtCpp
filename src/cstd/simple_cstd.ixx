@@ -26,6 +26,15 @@ export namespace cstd {
         using Callables::operator()...;
     };
 
+    template <typename L>
+    struct [[deprecated]] emplacer : L {
+        using L::operator();
+
+        /*implicit*/ operator decltype(auto)() {
+            return operator()();
+        }
+    };
+
     template <typename T1, typename T2>
     using CopyRef = std::conditional_t<std::is_lvalue_reference_v<T1>, std::remove_reference_t<T2>&,
                                        std::remove_reference_t<T2>&&>;
@@ -50,13 +59,25 @@ export namespace cstd {
     template <typename T>
     using GetMinNumStrUType = std::conditional_t<std::same_as<T, uint8_t>, uint16_t, T>;
 
+    template <typename T>
+    struct [[deprecated]] raw_forward {
+        T& t;
+
+        /*implicit*/ constexpr raw_forward(T& t) noexcept : t(t) {
+        }
+
+        /*implicit*/ constexpr operator T&&() {
+            return std::move(t);
+        }
+    };
+
     template <typename T, typename Y>
     struct pair_cast_mxn {
-        std::pair<T, Y> to_pair(this auto&& self) {
+        constexpr std::pair<T, Y> to_pair(this auto&& self) {
             return std::pair<T, Y>{self.first, self.second};
         }
 
-        /*implicit*/ operator std::pair<T, Y>(this auto&& self) noexcept {
+        /*implicit*/ constexpr operator std::pair<T, Y>(this auto&& self) noexcept {
             return self.to_pair();
         }
     };
@@ -64,14 +85,14 @@ export namespace cstd {
     template <typename T2>
     struct cast_lambda_t {
         template <typename T1>
-        NODISCARD decltype(auto) operator()(T1&& value) const noexcept
+        NODISCARD constexpr decltype(auto) operator()(T1&& value) const noexcept
             requires larger_t_ptr<std::remove_cvref<T1>>
         {
             return static_cast<CopyRef<T1, T2>>(value);
         }
 
         template <typename T1>
-        NODISCARD F_INLINE T2 operator()(T1 value) const noexcept
+        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
             requires(!larger_t_ptr<std::remove_cvref<T1>>)
         {
             return static_cast<T2>(value);
@@ -81,14 +102,14 @@ export namespace cstd {
     template <typename T2>
     struct ext_cast_lambda_t {
         template <typename T1>
-        NODISCARD F_INLINE T2 operator()(T1&& value) const noexcept
+        NODISCARD constexpr F_INLINE T2 operator()(T1&& value) const noexcept
             requires larger_t_ptr<std::remove_cvref<T1>>
         {
             return T2{value};
         }
 
         template <typename T1>
-        NODISCARD F_INLINE T2 operator()(T1 value) const noexcept
+        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
             requires(!larger_t_ptr<std::remove_cvref<T1>>)
         {
             return T2{value};
@@ -97,14 +118,14 @@ export namespace cstd {
 
     struct identify_lambda_t {
         template <typename T1>
-        NODISCARD F_INLINE decltype(auto) operator()(T1&& value) const noexcept
+        NODISCARD constexpr F_INLINE decltype(auto) operator()(T1&& value) const noexcept
             requires larger_t_ptr<std::remove_cvref<T1>>
         {
             return value;
         }
 
         template <typename T1>
-        NODISCARD F_INLINE T1 operator()(T1 value) const noexcept
+        NODISCARD constexpr F_INLINE T1 operator()(T1 value) const noexcept
             requires(!larger_t_ptr<std::remove_cvref<T1>>)
         {
             return value;
@@ -135,6 +156,8 @@ export namespace cstd {
     constexpr auto byteswap_v_func = []<typename T>(T value) -> T {
         if constexpr (requires { std::byteswap(value); }) {
             return std::byteswap(value);
+        } else if constexpr (std::is_enum_v<T>) {
+            return static_cast<T>(std::byteswap(static_cast<std::underlying_type_t<T>>(value)));
         } else {
             auto [value_field] = value;
             return T{std::byteswap(value_field)};
@@ -146,7 +169,7 @@ export namespace cstd {
         Callable callable;
 
         template <typename Callable2>
-        auto operator|(_func_or_false_line_Handler<Callable2> call2Cont) {
+        auto constexpr operator|(_func_or_false_line_Handler<Callable2> call2Cont) {
             if constexpr (std::same_as<Callable, bool>) {
                 return call2Cont;
             } else {
@@ -249,7 +272,7 @@ export namespace cstd {
     }
 
     template <typename T>
-    decltype(auto) forward_from_cpy(T value) {
+    constexpr decltype(auto) forward_from_cpy(T value) {
         if constexpr (std::is_rvalue_reference_v<T>) {
             return static_cast<T&&>(value);
         } else if constexpr (std::is_lvalue_reference_v<T>) {
@@ -259,7 +282,12 @@ export namespace cstd {
         }
     }
 
-    void add_reserve(auto& vec, size_t size) {
+    constexpr void add_reserve(auto& vec, size_t size) {
         vec.reserve(vec.size() + size);
     }
+
+    template <typename Base, typename... PMixins>
+    struct ApplyP : Base, PMixins... {
+        using Base::Base;
+    };
 } // namespace cstd

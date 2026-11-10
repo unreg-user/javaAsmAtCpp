@@ -17,8 +17,8 @@ export namespace reader::utils {
             return std::nullopt;
         }
 
-        return std::make_optional(
-                std::apply([](auto&&... args) { return Self{(*args)...}; }, opt_values)); // I hate this ecosystem...
+        return std::optional{
+                std::apply([](auto&&... args) { return Self{(*args)...}; }, opt_values)}; // I hate this ecosystem...
     }
 
     template <typename... Args, typename SpecR>

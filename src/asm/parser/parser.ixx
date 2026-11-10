@@ -1,6 +1,5 @@
 module;
 
-#include <bit>
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -19,6 +18,7 @@ import reader;
 import opcodes;
 import compl_flags;
 import simple_cstd;
+import gstd;
 import cp_consts;
 import parser_utils;
 import parser_concepts;
@@ -26,18 +26,30 @@ import array_parsers;
 import ptr_function;
 import dstd;
 import parser_b1;
+import parser_b2;
+import parser_wrappers_b2;
+import costd;
 
+/**
+ * According to the specification, if a collection in classNode is a JaacTranslator, the invocation of its
+ * (JaacTranslator) methods is guaranteed; if it is a JaacCollection, the invocation of its (JaacCollection) methods is
+ * not guaranteed.
+ *
+ */
 export namespace parser {
     template <typename ClassNT>
     using CondPairInParseRetType =
-            cstd::cond_pair<ClassNT, std::conditional_t<useWriteConcept<ClassNT>, DeserErr,
-                                                        cstd::ccompl_value<DeserErr, DeserErr::NONE>>>;
+            gstd::cond_pair<ClassNT, std::conditional_t<useWriteConcept<ClassNT>, DeserErr,
+                                                        gstd::ccompl_value<DeserErr, DeserErr::NONE>>>;
 
-    template <typename ClassNT /*CNT*/, typename SpecR = cflags::class_file_ptr_fs,
-              typename SpecW = cflags::class_file_ptr_fs, bool checkMagic = true, bool g1>
+    template <typename ClassNT>
+    using ParseRetType = std::expected<CondPairInParseRetType<JaacClassNTRetConverted<ClassNT>>, ParseErr>;
+
+    template <typename ClassNT /*CNT*/, typename SpecR = cflags::class_file_ptr,
+              typename SpecW = cflags::class_file_ptr, bool checkMagic = true, bool g1>
         requires JaacClassNT<ClassNT>
-    std::expected<CondPairInParseRetType<JaacClassNTRetConverted<ClassNT>>, ParseErr>
-    parse1(const reader::PreRWFileData<g1> preRWData, const reader::FileDataWithSize<> readData) noexcept {
+    ParseRetType<ClassNT> parse1(const reader::PreRWFileData<g1> preRWData,
+                                 const reader::FileDataWithSize<> readData) noexcept {
         using ReadPtr = ReadPtrBySpec<SpecR>;
         using WritePtr = WritePtrBySpec<SpecW>;
 
@@ -48,108 +60,164 @@ export namespace parser {
         ReadPtr readPtr{readData};
 
         if constexpr (checkMagic) {
-            DEF_OR_ELSE_OPT_UNEX(uint32_t, magic);
-            DEF_ASSERT_UNEX(magic == opcodes::magic);
+            DEF_OR_ELSE_OPT_UNEX(wrappers::MagicNumber, magic);
+            DEF_ASSERT_UNEX(static_cast<uint32_t>(magic) == opcodes::magic);
         } else {
             DEF_ASSERT_UNEX(readPtr.template check_and_move<4>());
         }
 
-        DEF_OR_ELSE_OPT_UNEX(uint16_t, minor_version);
-        DEF_OR_ELSE_OPT_UNEX(uint16_t, major_version);
+        DEF_OR_ELSE_OPT_UNEX(wrappers::VersionNumber, version);
 
         DEF_BOOL_CNT_FLAG_GEN(handleVersion);
-        auto versionH = cstd::or_else_falseCPY<handleVersionFlag>(
-                cstd::func_or_false_line(DEF_HANDLE(uint16_t, minor_version), DEF_HANDLE(uint16_t, major_version)));
+        // deep analys of version, lol
+        auto versionH = cstd::or_else_falseCPY<handleVersionFlag>(DEF_HANDLE(wrappers::VersionNumber, version));
 
-        if constexpr (parseLengthFlag == ParseLength::VERSION)
-            goto write_back_code;
+        DEF_BOOL_CNT_FLAG_GEN(parseCpoolStructure);
+        using CpoolArrInputT = std::conditional_t<parseCpoolStructureFlag, cp_consts::traits::cp_var, u8_span>;
 
-        DEF_OPT_ARRAY_HANDLE(cpool, Cpool, cpool, ReadPtr, std::span<uint8_t>, {
-            static_assert(!hasCorrectCpool || WithParseSize<decltype(classNode.cpool)>,
-                          "Invalid cpool field type (valid requires WithParseSize<TYPE> (from asm.parser_utils, if "
-                          "mode != NONE))");
+        DEF_COM_ARRAY_HANDLE(Cpool, cpool, CpoolArrInputT);
+        DEF_COM_ARRAY_HANDLE(Ifaces, ifaces, wrappers::CpoolSizeT);
+        DEF_COM_ARRAY_HANDLE(Fields, fields, common::MFInfo<>);
+        DEF_COM_ARRAY_HANDLE(Methods, methods, common::MFInfo<>);
+        DEF_COM_ARRAY_HANDLE(Attrs, attrs, common::DefVeryFullAttribute);
 
-            if constexpr (hasCorrectCpool) {
-                DEF_ASSERT_UNEX(classNode.cpool.jaac_set_parse_size(cpool_size));
-            }
-
-            T_CO_FLAG parseCpoolStructure = handleWrittenCpoolFlag == HandleMode::FULL;
-
-            if constexpr (parseCpoolStructure) {
-                DEF_ASSERT_UNEX(classNode.cpool.jaac_push_back(ReadPtr{nullptr, nullptr}));
-            }
-
-            for (int i = 1; i < cpool_size; ++i) {
-                uint8_t* iOld = readPtr.i;
-                bool is_unex;
-                parse1_const_big_ctx<false>(
-                        i, [](const opcodes::TagIdEnum, cp_consts::traits::variant) {},
-                        [&](const opcodes::TagIdEnum tagId) {
-                            is_unex = classNode.cpool.jaac_push_back(ReadPtr{iOld, readPtr.i});
-                            if (tagId == opcodes::TagIdEnum::CONSTANT_Double ||
-                                tagId == opcodes::TagIdEnum::CONSTANT_Long) {
-                                is_unex = is_unex || classNode.cpool.jaac_push_back(ReadPtr{nullptr, nullptr});
-                                i++;
-                            }
-                        });
-                DEF_ASSERT_UNEX(is_unex)
-            }
-        });
-
-        DEF_OR_ELSE_OPT_UNEX(uint16_t, access_flags);
-        DEF_GET_AND_I_HAND(CpoolSizeT, this_class);
-        DEF_OR_ELSE_OPT_UNEX(CpoolSizeT, super_class);
+        wrappers::AccessFlags access_flags;
+        wrappers::CpoolSizeT this_class;
+        wrappers::CpoolSizeT super_class;
 
         DEF_BOOL_CNT_FLAG_GEN(handleAccess);
         DEF_BOOL_CNT_FLAG_GEN(deepHandleThisClassIdx);
         DEF_BOOL_CNT_FLAG_GEN(handleSuperClassIdx);
 
-        auto postCPoolSimpleH = cstd::func_or_false_line(
-                cstd::or_else_falseCPY<handleAccessFlag>(DEF_HANDLE(AccessFlagsT, access_flags)),
-                cstd::or_else_falseCPY<deepHandleThisClassIdxFlag>(DEF_HANDLE(CpoolSizeT, this_class)),
-                cstd::or_else_falseCPY<handleSuperClassIdxFlag>(DEF_HANDLE(CpoolSizeT, super_class)));
+        auto postCPoolSimpleHRetsLambda = [&] {
+            return cstd::func_or_false_line(
+                    cstd::or_else_falseCPY<handleAccessFlag>(DEF_HANDLE(RawAccessFlagsT, access_flags)),
+                    cstd::or_else_falseCPY<deepHandleThisClassIdxFlag>(DEF_HANDLE(CpoolRSizeT, this_class)),
+                    cstd::or_else_falseCPY<handleSuperClassIdxFlag>(DEF_HANDLE(CpoolRSizeT, super_class)));
+        };
 
-        if constexpr (parseLengthFlag == ParseLength::CPOOL)
-            goto write_back_code;
+        std::conditional_t<parseLengthFlag >= ParseLength::CPOOL, decltype((postCPoolSimpleHRetsLambda())), bool>
+                postCPoolSimpleH;
 
-        DEF_OPT_ARRAY_HANDLE(ifaces, Ifaces, ifaces, ArraySizeT, ArraySizeT, {
-            if constexpr (handleWrittenIfacesFlag == HandleMode::FULL) {
-                for (int i = 0; i < ifaces_size; ++i) {
-                    DEF_OR_ELSE_OPT_UNEX(CpoolSizeT, iface);
-                    DEF_ASSERT_UNEX(classNode.ifaces.jaac_push_back(iface));
+        if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
+            DEF_OPT_ARRAY_HANDLE(cpool, Cpool, cpool, {
+                static_assert(!hasCorrectCpool || WithParseSize<decltype(classNode.cpool)>,
+                              "Invalid cpool field type (valid requires WithParseSize<TYPE> (from asm.parser_utils, if "
+                              "mode != NONE))");
+
+                if constexpr (shouldHasCorrectCpool) {
+                    classNode.cpool.jaac_set_parse_size(cpool_size);
+
+                    if constexpr (parseCpoolStructureFlag) {
+                        DEF_ASSERT_UNEX(classNode.cpool.jaac_push_back(cp_consts::traits::cp_var{}));
+                    } else {
+                        DEF_ASSERT_UNEX(classNode.cpool.jaac_push_back(u8_span{}));
+                    }
                 }
-            } else {
-                DEF_CHECK_MEMORY_OR_UNEX(sizeof(CpoolSizeT) * ifaces_size)
+
+                for (ArrayRSizeT i = 1; i < static_cast<ArrayRSizeT>(cpool_size); ++i) {
+                    u8_ptr iOld = readPtr.i;
+                    bool is_unex = false;
+                    auto skipLDIdx = [&](const opcodes::TagIdEnum tagId) {
+                        if (tagId == opcodes::TagIdEnum::CONSTANT_Double ||
+                            tagId == opcodes::TagIdEnum::CONSTANT_Long) {
+                            if constexpr (shouldHasCorrectCpool) {
+                                if constexpr (parseCpoolStructureFlag) {
+                                    is_unex = is_unex || !classNode.cpool.jaac_push_back(cp_consts::traits::cp_var{});
+                                } else {
+                                    is_unex = is_unex || !classNode.cpool.jaac_push_back(u8_span{});
+                                }
+                            }
+                            i++;
+                        }
+                    };
+                    cp_consts::parse1_const_big_ctx<parseCpoolStructureFlag>(
+                            readPtr,
+                            cstd::overload{[&](const opcodes::TagIdEnum tagId, cp_consts::traits::cp_var var) {
+                                               if constexpr (parseCpoolStructureFlag && hasCorrectCpool)
+                                                   is_unex = !classNode.cpool.jaac_push_back(var);
+                                               skipLDIdx(tagId);
+                                           },
+                                           [&](const opcodes::TagIdEnum tagId) {
+                                               if constexpr (!parseCpoolStructureFlag && hasCorrectCpool)
+                                                   is_unex = !classNode.cpool.jaac_push_back(
+                                                           static_cast<u8_span>(UncheckedReadPtr{iOld, readPtr.i - 1}));
+                                               skipLDIdx(tagId);
+                                           }});
+                    DEF_ASSERT_UNEX(!is_unex)
+                }
+            });
+
+            {
+                auto timed = wrappers::AccessFlags::parse(readPtr);
+                if (!timed) [[unlikely]] {
+                    return std::unexpected{ParseErr::INVALID};
+                }
+                access_flags = *timed;
             }
-        });
+            {
+                auto timed = wrappers::CpoolSizeT::parse(readPtr);
+                if (!timed) [[unlikely]] {
+                    return std::unexpected{ParseErr::INVALID};
+                }
+                this_class = *timed;
+            }
+            DEF_I_HANDLE(wrappers::CpoolSizeT, this_class);
+            {
+                auto timed = wrappers::CpoolSizeT::parse(readPtr);
+                if (!timed) [[unlikely]] {
+                    return std::unexpected{ParseErr::INVALID};
+                }
+                super_class = *timed;
+            }
 
-        if constexpr (parseLengthFlag == ParseLength::IFACES)
-            goto write_back_code;
+            postCPoolSimpleH = postCPoolSimpleHRetsLambda();
 
-        DEF_OPT_ARRAY_HANDLE(fields, Fields, fields, common::FieldInfo<>, {
-            for (int i = 0; i < fields_size; ++i) {
-                if constexpr (handleWrittenFieldsFlag == HandleMode::FULL) {
-                    DEF_OR_ELSE_OPT_UNEX(AccessFlagsT, access_flags);
-                    DEF_ASSERT_UNEX(classNode.fields.jaac_push_back());
+            if constexpr (parseLengthFlag >= ParseLength::IFACES) {
+                DEF_OPT_ARRAY_HANDLE(ifaces, Ifaces, ifaces, {
+                    if constexpr (shouldHasCorrectIfaces) {
+                        for (ArrayRSizeT i = 0; i < static_cast<ArrayRSizeT>(ifaces_size); ++i) {
+                            DEF_OR_ELSE_OPT_UNEX(wrappers::CpoolSizeT, iface);
+                            DEF_ASSERT_UNEX(classNode.ifaces.jaac_push_back(iface));
+                        }
+                    } else {
+                        DEF_CHECK_MEMORY_OR_UNEX(sizeof(ArrayRSizeT) * static_cast<ArrayRSizeT>(ifaces_size))
+                    }
+                });
+
+                if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                    DEF_OPT_ARRAY_HANDLE(fields, Fields, fields,
+                                         { parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size); });
+
+
+                    if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                        DEF_OPT_ARRAY_HANDLE(methods, Methods, methods, {
+                            parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size);
+                        });
+
+
+                        if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                            DEF_OPT_ARRAY_HANDLE(attrs, Attrs, attrs, {
+                                parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
+                                        readPtr, classNode.attrs, attrs_size);
+                            });
+                        }
+                    }
                 }
             }
-        });
+        }
 
-        if constexpr (parseLengthFlag == ParseLength::FIELDS)
-            goto write_back_code;
+        if constexpr (requires { classNode.postread_handle(); })
+            classNode.postread_handle();
 
-    write_back_code:
-
-        auto retValLambda = [&](DeserErr flag = DeserErr::NONE)
-                -> std::expected<CondPairInParseRetType<JaacClassNTRetConverted<ClassNT>>, ParseErr> {
+        auto retValLambda = [&](DeserErr flag = DeserErr::NONE) -> ParseRetType<ClassNT> {
             if constexpr (requires { classNode.jaac_return_convert(); }) {
-                return std::expected{CondPairInParseRetType<ClassNT>{classNode.jaac_return_convert(), flag}};
+                return ParseRetType<ClassNT>{CondPairInParseRetType<ClassNT>{classNode.jaac_return_convert(), flag}};
             } else {
-                return std::expected{CondPairInParseRetType<ClassNT>{classNode, flag}};
+                return ParseRetType<ClassNT>{CondPairInParseRetType<ClassNT>{classNode, flag}};
             }
         };
 
-        classNode.postread_handle();
         if constexpr (useWriteFlag) {
             // open file
             const auto wDataOpt = preRWData.open("wb");
@@ -160,44 +228,41 @@ export namespace parser {
             // call handlers
             versionH();
             if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
-                DEF_ARRAY_FINAL_H_CALL(Cpool, cpool)
+                DEF_ARRAY_PREWRITE_CALL(Cpool, cpool)
                 postCPoolSimpleH();
                 if constexpr (parseLengthFlag >= ParseLength::IFACES) {
-                    DEF_ARRAY_FINAL_H_CALL(Ifaces, ifaces)
+                    DEF_ARRAY_PREWRITE_CALL(Ifaces, ifaces)
+                    if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                        DEF_ARRAY_PREWRITE_CALL(Fields, fields)
+                        if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                            DEF_ARRAY_PREWRITE_CALL(Methods, methods)
+                            if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                                DEF_ARRAY_PREWRITE_CALL(Attrs, attrs)
+                            }
+                        }
+                    }
                 }
             }
 
-            // adding back
+            // deser
             std::vector<uint8_t> outData;
             outData.reserve(readData.size);
             WritePtr writePtr{outData};
 
-            auto backAddingLambda1 = [&outData]<bool swap>(auto handled) {
-                auto final_value = swap ? std::byteswap(handled) : handled;
-                outData.append_range(cstd::convert_to_span<uint8_t>(final_value));
-            };
-            auto backAddingLambda = [backAddingLambda1]<bool swap>(auto... handled) {
-                (..., backAddingLambda1.template operator()<swap>(handled));
-            };
-            auto defBackAddingLambda = [backAddingLambda](auto... handled) {
-                return backAddingLambda.template operator()<true>(handled);
-            };
-            auto rawBackAddingLambda = [backAddingLambda](auto... handled) {
-                return backAddingLambda.template operator()<false>(handled);
-            };
-
             outData.append_range(opcodes::magic_array_rev);
-            defBackAddingLambda(minor_version, major_version);
+            version.deser(writePtr);
 
             if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
-                DEF_DESER(Cpool, cpool, true, [&](std::span<uint8_t> span) {
-                    if (!span.empty())
-                        writePtr.deser_range(span);
-                });
+                DEF_JAAC_COMPLEX_DESER(Cpool, cpool);
 
-                defBackAddingLambda(access_flags);
+                access_flags.deser(writePtr);
+                this_class.deser(writePtr);
+                super_class.deser(writePtr);
 
-                DEF_NUM_PRIM_DESER(Ifaces, ifaces);
+                DEF_JAAC_PRIM_DESER(Ifaces, ifaces, wrappers::CpoolSizeT);
+                DEF_JAAC_COMPLEX_DESER(Fields, fields);
+                DEF_JAAC_COMPLEX_DESER(Methods, methods);
+                DEF_JAAC_COMPLEX_DESER(Attrs, attrs);
             }
 
             outData.append_range(readPtr);
@@ -210,10 +275,10 @@ export namespace parser {
         return retValLambda();
     }
 
-    template <typename ClassNT, typename SpecR = cflags::class_file_ptr_fs, typename SpecW = cflags::class_file_ptr_fs,
+    template <typename ClassNT, typename SpecR = cflags::class_file_ptr, typename SpecW = cflags::class_file_ptr,
               bool useFlush = true, bool checkMagic = true, bool g1>
-    std::expected<CondPairInParseRetType<JaacClassNTRetConverted<ClassNT>>, ParseErr>
-    parse(const reader::PreRWFileData<g1> preRWData) noexcept {
+        requires JaacClassNT<ClassNT>
+    ParseRetType<ClassNT> parse(const reader::PreRWFileData<g1> preRWData) noexcept {
         const auto rDataOpt = preRWData.open("rb");
 
         if (!rDataOpt)

@@ -1,0 +1,1 @@
+Basically, I decided to completely drop support for struct aggregateness because it imposes too many architectural constraints.

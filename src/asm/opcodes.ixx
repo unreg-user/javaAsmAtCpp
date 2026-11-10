@@ -296,9 +296,9 @@ namespace opcodes {
         };
     } // namespace Ver
 
-    export using TagIdType = uint8_t;
+    export using TagIdEnumType = uint8_t;
 
-    export enum class TagIdEnum : TagIdType {
+    export enum class TagIdEnum : TagIdEnumType {
         CONSTANT_Integer = 3,
         CONSTANT_Float = 4,
         CONSTANT_Long = 5,
@@ -318,11 +318,11 @@ namespace opcodes {
         CONSTANT_Package = 20
     };
 
-    export TagIdType as_number(TagIdEnum instance) {
-        return static_cast<TagIdType>(instance);
+    export TagIdEnumType as_number(TagIdEnum instance) {
+        return static_cast<TagIdEnumType>(instance);
     }
 
-    export TagIdEnum as_enum(TagIdType number) {
+    export TagIdEnum as_enum(TagIdEnumType number) {
         return static_cast<TagIdEnum>(number);
     }
 

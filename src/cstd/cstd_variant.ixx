@@ -130,10 +130,13 @@ export namespace cstd {
     namespace _internal {
         template <size_t, EmptyValueMode, typename...>
         struct _0variant_of_ptrs_and_little {};
-    }
+    } // namespace _internal
 
     template <size_t little = ptr_size, EmptyValueMode emptyValueMode = EmptyValueMode::HASNT, typename... DerefTypes>
-    struct variant_of_ptrs_and_little : std::variant<OptPtrTBy<DerefTypes, little>...>, std::conditional_t<emptyValueMode != EmptyValueMode::HASNT, mixins::emptiable_variant_mixin<DerefTypes...[0]>, _internal::_0variant_of_ptrs_and_little<little, emptyValueMode, DerefTypes...>> {
+    struct variant_of_ptrs_and_little
+        : std::variant<OptPtrTBy<DerefTypes, little>...>,
+          std::conditional_t<emptyValueMode != EmptyValueMode::HASNT, mixins::emptiable_variant_mixin<DerefTypes...[0]>,
+                             _internal::_0variant_of_ptrs_and_little<little, emptyValueMode, DerefTypes...>> {
         using varT = std::variant<OptPtrTBy<DerefTypes, little>...>;
 
         template <typename DerefType>
@@ -146,9 +149,7 @@ export namespace cstd {
     public:
         NODISCARD F_INLINE static auto add_emp_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
             if constexpr (emptyValueMode != EmptyValueMode::HASNT) {
-                return overload {
-                    emp_callable, callable
-                };
+                return overload{emp_callable, callable};
             } else {
                 return callable;
             }
@@ -156,24 +157,17 @@ export namespace cstd {
 
         NODISCARD F_INLINE static auto add_emp_ignore_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
             if constexpr (emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
-                return overload {
-                    emp_callable, callable
-                };
+                return overload{emp_callable, callable};
             } else {
                 return callable;
             }
         }
 
-        template <bool mustHandleEmpty, typename Callable>
+        template <typename Callable>
         NODISCARD F_INLINE static auto emp_ignore_in_visit_lambda(Callable&& callable) noexcept {
-            if constexpr (mustHandleEmpty) {
-                using RetT = decltype(std::forward<Callable>(callable)(std::declval<AnyFullType>()));
-                return add_emp_ignore_to_visit_lambda(std::forward<Callable>(callable), [](EmptyType) -> RetT {
-                    std::unreachable();
-                });
-            } else {
-                return []{};
-            }
+            using RetT = decltype(std::forward<Callable>(callable)(std::declval<AnyFullType>()));
+            return add_emp_ignore_to_visit_lambda(std::forward<Callable>(callable),
+                                                  [](EmptyType) -> RetT { std::unreachable(); });
         }
 
         constexpr void destruct_deref() const noexcept {
@@ -185,9 +179,13 @@ export namespace cstd {
             return std::holds_alternative<GetOptType<DerefType>>(*this);
         }
 
-        template <bool mustHandleEmpty = false, typename Callable>
+        NODISCARD constexpr auto is_holds_empty() const noexcept {
+            return std::holds_alternative<EmptyType>(*this);
+        }
+
+        template <typename Callable>
         constexpr auto deref_visit(Callable&& callable) const noexcept {
-            return std::visit(this->template emp_ignore_in_visit_lambda<mustHandleEmpty>(
+            return std::visit(emp_ignore_in_visit_lambda(
                     overload{[&]<typename T>(T self)
                                  requires std::is_pointer_v<T>
                              { return std::forward<Callable>(callable)(*self); },
@@ -195,9 +193,9 @@ export namespace cstd {
                     *this);
         }
 
-        template <bool mustHandleEmpty = false, typename BigC, typename SmallC>
+        template <typename BigC, typename SmallC>
         constexpr auto sep_visit(BigC&& bigC, BigC&& smallC) const noexcept {
-            return std::visit(this->template emp_ignore_in_visit_lambda<mustHandleEmpty>(overload{
+            return std::visit(emp_ignore_in_visit_lambda(overload{
                                       [&bigC](const auto* self) { return std::forward<BigC>(bigC)(self); },
                                       [&smallC](const auto self) { return std::forward<SmallC>(smallC)(self); }}),
                               *this);
@@ -215,17 +213,15 @@ export namespace cstd {
                                         selfVal.operatorKK(os);
                                         os << ")";
                                     }};
-            auto lambda = add_emp_to_visit_lambda(lambda0, [&os](EmptyType) {
-                os << "EMPTY()";
-            });
+            auto lambda = add_emp_to_visit_lambda(lambda0, [&os](EmptyType) { os << "EMPTY()"; });
             std::visit(lambda, self);
             return os;
         }
 
-        /*implicit*/ variant_of_ptrs_and_little(const variant_of_ptrs_and_little& other) noexcept
-            : varT(other) {}
-        /*implicit*/ variant_of_ptrs_and_little(variant_of_ptrs_and_little&& other) noexcept
-            : varT(std::move(other)) {}
+        /*implicit*/ variant_of_ptrs_and_little(const variant_of_ptrs_and_little& other) noexcept : varT(other) {
+        }
+        /*implicit*/ variant_of_ptrs_and_little(variant_of_ptrs_and_little&& other) noexcept : varT(std::move(other)) {
+        }
 
         variant_of_ptrs_and_little& operator=(const variant_of_ptrs_and_little& other) noexcept {
             if (this != &other) {
@@ -243,48 +239,60 @@ export namespace cstd {
 
         template <typename T>
         /*implicit*/ constexpr variant_of_ptrs_and_little(const T value) noexcept
-            requires (!cstd::larger_than<T, little>) && (!std::is_same_v<T, variant_of_ptrs_and_little>)
+            requires(!cstd::larger_than<T, little>) && (!std::is_same_v<T, variant_of_ptrs_and_little>)
             : varT(value) {
         }
 
         template <typename T>
-        //NOLINTNEXTLINE(*-forwarding-reference-overload)
+        // NOLINTNEXTLINE(*-forwarding-reference-overload)
         /*implicit*/ variant_of_ptrs_and_little(T&& value) noexcept
-            requires cstd::larger_than<std::remove_cvref_t<T>, little> && (!std::same_as<std::remove_cvref_t<T>, variant_of_ptrs_and_little>)
+            requires cstd::larger_than<std::remove_cvref_t<T>, little> &&
+                     (!std::same_as<std::remove_cvref_t<T>, variant_of_ptrs_and_little>)
             : varT(cstd::copy_to_heap(std::forward<T>(value))) {
         }
 
-        /*implicit*/ variant_of_ptrs_and_little() noexcept requires (emptyValueMode != EmptyValueMode::HASNT) && (!cstd::larger_than<EmptyType, little>) && std::is_default_constructible_v<EmptyType>
-            : varT(EmptyType{}) {}
+        /*implicit*/ variant_of_ptrs_and_little() noexcept
+            requires(emptyValueMode != EmptyValueMode::HASNT) &&
+                    (!cstd::larger_than<EmptyType, little>) && std::is_default_constructible_v<EmptyType>
+            : varT(EmptyType{}) {
+        }
 
-        /*implicit*/ variant_of_ptrs_and_little() noexcept requires (emptyValueMode != EmptyValueMode::HASNT) && cstd::larger_than<EmptyType, little> && std::is_default_constructible_v<EmptyType>
-            : varT(cstd::copy_to_heap(EmptyType{})) {}
+        /*implicit*/ variant_of_ptrs_and_little() noexcept
+            requires(emptyValueMode != EmptyValueMode::HASNT) && cstd::larger_than<EmptyType, little> &&
+                    std::is_default_constructible_v<EmptyType>
+            : varT(cstd::copy_to_heap(EmptyType{})) {
+        }
     };
 
     template <typename... DerefTypes>
     using variant_of_ptrs_and_little_t_ptr = variant_of_ptrs_and_little<ptr_size, EmptyValueMode::HASNT, DerefTypes...>;
 
     template <typename... DerefTypes>
-    using emp_ignore_variant_of_ptrs_and_little_t_ptr = variant_of_ptrs_and_little<ptr_size, EmptyValueMode::HAS_IGNORE_VISIT, DerefTypes...>;
+    using emp_ignore_variant_of_ptrs_and_little_t_ptr =
+            variant_of_ptrs_and_little<ptr_size, EmptyValueMode::HAS_IGNORE_VISIT, DerefTypes...>;
 
-    template <typename Var>
+    template <typename Variant>
     struct var_opt {
-        Var var;
+        Variant var;
 
-        using EmptyT = Var::EmptyT;
+        using EmptyT = Variant::EmptyT;
 
-        var_opt() noexcept : var(Var{EmptyT{}}) {
+        var_opt() noexcept : var(Variant{EmptyT{}}) {
         }
 
-        /*implicit*/ var_opt(Var var) noexcept : var(var) {
+        /*implicit*/ var_opt(Variant var) noexcept : var(var) {
         }
 
         NODISCARD explicit operator bool() const noexcept {
             return !var.is_empty();
         }
 
-        NODISCARD auto operator*() const noexcept {
-            return var;
+        NODISCARD decltype(auto) operator*(this auto&& self) noexcept {
+            return self.var;
+        }
+
+        /*implicit*/ operator std::optional<Variant>() const noexcept {
+            return std::optional{var};
         }
     };
 } // namespace cstd

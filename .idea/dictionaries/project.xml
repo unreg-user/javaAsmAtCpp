@@ -1,11 +1,15 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>Cowr</w>
       <w>Cpool</w>
       <w>Fieldref</w>
+      <w>IFACES</w>
       <w>Ifaces</w>
+      <w>Indep</w>
       <w>Insn</w>
       <w>Methodref</w>
+      <w>Postfields</w>
       <w>Prevnearst</w>
       <w>aaload</w>
       <w>aastore</w>
@@ -99,6 +103,7 @@
       <w>nstance</w>
       <w>offsetnearst</w>
       <w>postcomplete</w>
+      <w>prefields</w>
       <w>putfield</w>
       <w>putstatic</w>
       <w>saload</w>

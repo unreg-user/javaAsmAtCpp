@@ -1245,3 +1245,111 @@ if constexpr (timed_pre1) { \
         DU_UNION_VIA_AL_DT(Double);
         DU_UNION_VIA_AL_DT(Long);
     }
+
+
+        static_assert((handleWritten##uName##Flag == HandleMode::NONE && hasCorrectTranslate##uName) || (handleWritten##uName##Flag == HandleMode::APPEND && hasCorrectAppend##uName) || (handleWritten##uName##Flag == HandleMode::FULL && hasCorrect##uName), \
+        "Invalid "#path" field type (valid requires "##errValidType##" (from asm.parser_utils, if mode != NONE) and JaacCollectionTranslatePart<TYPE> (from asm.parser_utils, if mode = APPEND)) or undeclared"); \
+
+        COM_BOOL hasCorrectAppend##uName = hasCorrect##uName && hasCorrectTranslate##uName; \
+
+                auto tagId = TagIdTypeT::parse(readPtr);
+
+                auto optOptVar = cp_consts::switch_tag_id_enum_2compl<cstd::var_opt<variant>>(
+                        tagId, [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> cstd::var_opt<variant> {
+                            if (auto value = Trait::parse(readPtr)) {
+                                return {{*value}};
+                            }
+                            return {};
+                        });
+                return optOptVar ? cstd::var_opt<variant>{} : *optOptVar;
+
+
+                auto tagId = TagIdTypeT::parse(readPtr);
+
+                auto optOptVar = cp_consts::switch_tag_id_enum_2compl<bool>(
+                        tagId, [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> bool {
+                            return Trait::check_and_move(readPtr);
+                        });
+                if (optOptVar) [[unlikely]] {
+                    return false;
+                }
+                return *optOptVar;
+
+
+
+#define JAAC_FOR(classNode, name, path, pre_action, _Ty, ...) \
+        { \
+            auto end_##name = classNode.path.jaac_end(); \
+            auto begin_##name = classNode.path.jaac_begin(); \
+            pre_action; \
+            for (auto pre_i_##name = begin_##name; pre_i_##name != end_##name; ++pre_i_##name) { \
+                  _Ty i_##name = *pre_i_##name; \
+                  __VA_ARGS__;  \
+            } \
+        }
+
+#define DEF_JAAC_FOR(name, path, _Ty, ...) JAAC_FOR(classNode, name, path,, _Ty, __VA_ARGS__)
+#define DEF_SKIP0_JAAC_FOR(name, path, _Ty, ...) JAAC_FOR(classNode, name, path, begin_##name++, _Ty, __VA_ARGS__)
+// #define PUSH_BACK(coll, ...) if constexpr ( requires { { cool.jaac() } -> std::same_as<bool>; } )
+#define DEF_BACK(timed_lamda, stack) BACK(heapHandlers, timed_lamda)
+#define BACK(outDataLs, timed_lamda) \
+     if constexpr (!std::same_as<decltype(timed_lamda), bool> && useWriteFlag) { \
+           auto& odl = outDataLs; \
+           odl.push_back(timed_lamda); \
+     }
+/*
+struct ClassN6 {
+    C_FLAG_E(handleVersion);
+
+    static uint64_t m_handle_version(const uint32_t ver) {
+        std::cout << "s";
+        return 0;
+    }
+};*/;
+
+        auto m_handle_version(Version ver) {
+            ver.major = 0xFFFF;
+            version = ver;
+            //return [&] { return Version{static_cast<uint16_t>( cpool.size() ), static_cast<uint16_t>( cpool.size()) }; };
+        }
+
+        auto handle_major_version(const uint16_t major) {
+            version.major = major;
+            return [] () -> uint16_t { return 144; };
+        }
+                /*DEF_DESER(Cpool, cpool, cstd::ImplConvertableToCowr<std::span<uint8_t>>, true, [&](std::span<uint8_t> span) {
+                    writePtr.deser_range(span);
+                });*/
+
+
+        /*implicit*/ constexpr operator T&() & { \
+            return this->Base::instance; \
+        } \
+        /*implicit*/ constexpr operator const T&() const & { \
+            return this->Base::instance; \
+        } \
+        /*implicit*/ constexpr operator T&&() && { \
+            return std::move(this->Base::instance); \
+        } \
+        /*implicit*/ constexpr operator const T&&() const&& { \
+            return std::move(this->Base::instance); \
+        } \
+
+        /*implicit*/ constexpr operator T&() & {
+            return instance;
+        }
+
+        /*implicit*/ constexpr operator const T&() const& {
+            return instance;
+        }
+
+        /*implicit*/ constexpr operator T&&() && {
+            return std::move(instance);
+        }
+
+        /*implicit*/ constexpr operator const T&&() const&& {
+            return std::move(instance);
+        }
+
+    //template <KN Container, typename... Types>
+    //using SerCombinatorPMxnBy = SerCombinatorPMxn<Container<Types...>, Types...>;

@@ -7,6 +7,7 @@ module;
 
 #include <iostream>
 #include "../../cstd/macro.h"
+#include "../parser/parser_mcr.h"
 #include "cp_consts_mcr.h"
 
 export module cp_consts;
@@ -20,92 +21,137 @@ import cstd_variant;
 import read_utils;
 import parser_wrappers_b2;
 import gstd;
+import parser_b2;
 
 export namespace cp_consts {
-    using SizeT = parser::wrappers::CpoolIdx;
-    using RefKindT = parser::common::wrappers::Number<uint8_t>;
+    using SizeT = parser::wrappers::CpoolSizeT;
+    using RefKindT = parser::wrappers::Number<uint8_t>;
+    using TagIdTypeT = parser::wrappers::Number<opcodes::TagIdEnum>;
 
     namespace inst {
-        template <typename Prim, typename RawPrim = gstd::getWidstructDefBaser<Prim>::Result>
-        struct AbsPrimitive {
+        template <opcodes::TagIdEnum tag, typename Prim, typename RawPrim = gstd::GetWidstructDefBaser<Prim>::Result>
+        struct Primitive : parser::common::SerCombinatorPMxn<Primitive<tag, Prim, RawPrim>, Prim> {
             Prim value;
 
+            TAG_FLAG(tag);
+
+            explicit constexpr Primitive(Prim v) noexcept : value(v) {
+            }
+
+            constexpr Primitive() noexcept = default;
+
             NODISCARD std::string to_str() const noexcept {
-                return std::to_string(gstd::unwrap(static_cast<cstd::GetMinNumStrUType<RawPrim>>(value)));
+                return std::to_string(static_cast<cstd::GetMinNumStrUType<RawPrim>>(gstd::unwrap(value)));
             }
 
             template <typename SpecW>
-            void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
                 value.deser(writePtr);
-            }
-
-        protected:
-            template <typename SpecR>
-            NODISCARD static std::optional<AbsPrimitive> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return std::make_optional(AbsPrimitive{Prim::parse(readPtr)});
-            }
-            template <typename SpecR>
-            NODISCARD static constexpr bool abs_check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return Prim::check_and_move(readPtr);
+                return {};
             }
         };
 
-        struct Class {
+        struct Class : parser::common::SerCombinatorPMxn<Class, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT classIdx;
+
+            explicit constexpr Class(const SizeT v) noexcept : classIdx(v) {
+            }
+
+            constexpr Class() noexcept = default;
+
             DEF_TAG_FLAG(CONSTANT_Class)
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(classIdx));
             }
 
-            DEF_METHODS(Class, classIdx)
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                reader::utils::deser_rev(writePtr, classIdx);
+                return {};
+            }
         };
 
-        struct AbsMF {
+        template <opcodes::TagIdEnum tag>
+        struct MF : parser::common::SerCombinatorPMxn<MF<tag>, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT classIdx;
             SizeT nameAndTypeIdx;
+
+            TAG_FLAG(tag)
+
+            constexpr MF(const SizeT classIdx, const SizeT nameAndTypeIdx) noexcept :
+                classIdx(classIdx), nameAndTypeIdx(nameAndTypeIdx) {
+            }
+
+            constexpr MF() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(classIdx)) + ".#" +
                        std::to_string(gstd::unwrap(nameAndTypeIdx));
             }
 
-            DEF_DESER(classIdx, nameAndTypeIdx)
-
-        protected:
-            template <typename SpecR>
-            NODISCARD static std::optional<AbsMF> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return reader::utils::parse_rev<AbsMF, decltype(classIdx), decltype(nameAndTypeIdx)>(readPtr);
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                classIdx.deser(writePtr);
+                nameAndTypeIdx.deser(writePtr);
+                return {};
             }
-
-            DEF_ABS_CHECK_AND_MOVE(AbsMF)
         };
 
-        struct String {
+        struct String : parser::common::SerCombinatorPMxn<String, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT stringIdx;
+
             DEF_TAG_FLAG(CONSTANT_String)
+
+            explicit constexpr String(const SizeT stringIdx) noexcept : stringIdx(stringIdx) {
+            }
+
+            constexpr String() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(stringIdx));
             }
 
-            DEF_METHODS(String, stringIdx)
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                stringIdx.deser(writePtr);
+                return {};
+            }
         };
 
-        struct AbsMP {
+        template <opcodes::TagIdEnum tag>
+        struct MP : parser::common::SerCombinatorPMxn<MP<tag>, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT nameIdx;
+
+            TAG_FLAG(tag)
+
+            explicit constexpr MP(const SizeT nameIdx) noexcept : nameIdx(nameIdx) {
+            }
+
+            constexpr MP() noexcept = default;
+
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                nameIdx.deser(writePtr);
+                return {};
+            }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(nameIdx));
             }
-
-            DEF_ABS_METHODS_PACK(AbsMP, nameIdx)
         };
 
         struct MethodHandle {
             SizeT refIdx;
             RefKindT refKind;
+
             DEF_TAG_FLAG(CONSTANT_MethodHandle)
+
+            explicit constexpr MethodHandle(const SizeT refIdx, const RefKindT refKind) noexcept :
+                refIdx(refIdx), refKind(refKind) {
+            }
+
+            constexpr MethodHandle() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return std::to_string(gstd::unwrap(refKind)) + ":#" + std::to_string(gstd::unwrap(refIdx));
@@ -114,162 +160,160 @@ export namespace cp_consts {
             template <typename SpecR>
             NODISCARD static constexpr std::optional<MethodHandle>
             parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                const auto refKind = readPtr.template parse_rev<uint8_t>();
-                const auto refIdx = readPtr.template parse_rev<SizeT>();
+                const auto refKind = RefKindT::parse(readPtr);
+                const auto refIdx = SizeT::parse(readPtr);
                 if (!(refKind && refIdx)) [[unlikely]]
                     return std::nullopt;
-                return {MethodHandle{.refIdx = *refIdx, .refKind = *refKind}};
+                return {MethodHandle{*refIdx, *refKind}};
             }
 
             template <typename SpecR>
             NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return reader::utils::check_and_move<decltype(refIdx), decltype(refKind)>(readPtr);
-                ;
+                return RefKindT::check_and_move(readPtr) && SizeT::check_and_move(readPtr);
             }
 
-            DEF_DESER(refKind, refIdx)
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                refKind.deser(writePtr);
+                refIdx.deser(writePtr);
+                return {};
+            }
         };
 
-        struct NameAndType {
+        struct NameAndType
+            : parser::common::SerCombinatorPMxn<NameAndType, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT nameIdx, descIdx;
+
             DEF_TAG_FLAG(CONSTANT_NameAndType)
+
+            explicit constexpr NameAndType(const SizeT nameIdx, const SizeT descIdx) noexcept :
+                nameIdx(nameIdx), descIdx(descIdx) {
+            }
+
+            constexpr NameAndType() noexcept = default;
+
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                nameIdx.deser(writePtr);
+                descIdx.deser(writePtr);
+                return {};
+            }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(nameIdx)) + ":#" + std::to_string(gstd::unwrap(descIdx));
             }
-
-            template <typename SpecR>
-            NODISCARD static std::optional<NameAndType> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return reader::utils::parse_rev<NameAndType, decltype(nameIdx), decltype(descIdx)>(readPtr);
-            }
-
-            DEF_DESER(nameIdx, descIdx)
-            DEF_CHECK_AND_MOVE(NameAndType)
         };
 
-        struct MethodType {
+        struct MethodType : parser::common::SerCombinatorPMxn<MethodType, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT descIdx;
+
             DEF_TAG_FLAG(CONSTANT_MethodType)
+
+            explicit constexpr MethodType(const SizeT descIdx) noexcept : descIdx(descIdx) {
+            }
+
+            constexpr MethodType() noexcept = default;
+
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                descIdx.deser(writePtr);
+                return {};
+            }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(descIdx));
             }
-
-            DEF_METHODS(MethodType, descIdx)
         };
 
-        struct AbsDynamic {
+        template <opcodes::TagIdEnum tag>
+        struct Dynamic : parser::common::SerCombinatorPMxn<Dynamic<tag>, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
             SizeT bootstrapMethodAttrIdx, nameAndTypeIdx;
+
+            TAG_FLAG(tag)
+
+            explicit constexpr Dynamic(const SizeT bootstrapMethodAttrIdx, const SizeT nameAndTypeIdx) noexcept :
+                bootstrapMethodAttrIdx(bootstrapMethodAttrIdx), nameAndTypeIdx(nameAndTypeIdx) {
+            }
+
+            constexpr Dynamic() noexcept = default;
+
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                bootstrapMethodAttrIdx.deser(writePtr);
+                nameAndTypeIdx.deser(writePtr);
+                return {};
+            }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
                 return "#" + std::to_string(gstd::unwrap(bootstrapMethodAttrIdx)) + ":#" +
                        std::to_string(gstd::unwrap(nameAndTypeIdx));
             }
-
-            DEF_DESER(bootstrapMethodAttrIdx, nameAndTypeIdx)
-
-        protected:
-            template <typename SpecR>
-            NODISCARD static std::optional<AbsDynamic> abs_parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return reader::utils::parse_rev<AbsDynamic, decltype(bootstrapMethodAttrIdx), decltype(nameAndTypeIdx)>(
-                        readPtr);
-            }
-
-            DEF_ABS_CHECK_AND_MOVE(AbsDynamic)
         };
 
-        template <bool shouldFree = false>
-        struct Utf8 {
-            std::span<uint8_t> utf8Info;
-            using Utf8SizeT = uint16_t;
+        struct SourceUtf8 : parser::common::SerCombinatorPMxn<SourceUtf8, parser::common::RawJaacSpan<>> {
+            parser::common::RawJaacSpan<> span{nullptr};
+
             DEF_TAG_FLAG(CONSTANT_Utf8)
 
+            explicit constexpr SourceUtf8(const parser::common::RawJaacSpan<> span) noexcept :
+                span(span) {
+            }
+
+            constexpr SourceUtf8() noexcept = default;
+
+            template <typename SpecW>
+            void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                return span.deser(writePtr);
+            }
+
             NODISCARD std::string to_str() const noexcept {
-                return {utf8Info.begin(), utf8Info.end()};
-            }
-
-            template <typename SpecR>
-            NODISCARD static constexpr std::optional<Utf8> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                const auto lengthOpt = readPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
-                if (!lengthOpt) [[unlikely]]
-                    return std::nullopt;
-
-                uint8_t* strStartPtr = readPtr.i;
-                if (const size_t length = *lengthOpt; readPtr.check_and_move(length)) [[likely]] {
-                    return std::make_optional(Utf8(std::span{strStartPtr, length}));
-                    // ReSharper disable once CppRedundantElseKeywordInsideCompoundStatement
-                } else {
-                    return std::nullopt;
-                }
-            }
-
-            template <typename SpecR>
-            NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                const auto lengthOpt = readPtr.template parse_rev<Utf8SizeT>().transform(cstd::cast_lambda<size_t>);
-                if (!lengthOpt) [[unlikely]]
-                    return false;
-                const size_t length = *lengthOpt;
-                return readPtr.check_and_move(length);
-            }
-
-            NODISCARD void deser(parser::WritePtrBySpec<auto>& writePtr) const noexcept {
-                writePtr.deser_rev(static_cast<Utf8SizeT>(utf8Info.size()));
-                writePtr.deser_range(utf8Info);
-            }
-
-            ~Utf8() noexcept {
-                if constexpr (shouldFree) {
-                    delete[] utf8Info.data();
-                }
-            }
-
-            /*implicit*/ F_INLINE Utf8(const std::span<uint8_t> utf8Info) : utf8Info(utf8Info) {
-            }
-
-            explicit Utf8(Utf8&& old) noexcept : Utf8(old.utf8Info) {
-                old.utf8Info = {};
-            }
-
-            explicit Utf8(Utf8& old) noexcept : Utf8(old.utf8Info) {
-                old.utf8Info = {};
+                return {span.begin(), span.end()};
             }
         };
 
-        namespace spec {
-            DEF_ABS_EXT_STRUCT(PrInt, AbsPrimitive<parser::wrappers::JInt>, CONSTANT_Integer)
-            DEF_ABS_EXT_STRUCT(PrFloat, AbsPrimitive<parser::wrappers::JFloat>, CONSTANT_Float)
-            DEF_ABS_EXT_STRUCT(PrDouble, AbsPrimitive<parser::wrappers::JDouble>, CONSTANT_Double)
-            DEF_ABS_EXT_STRUCT(PrLong, AbsPrimitive<parser::wrappers::JLong>, CONSTANT_Long)
-            DEF_ABS_EXT_STRUCT(FRef, AbsMF, CONSTANT_Fieldref)
-            DEF_ABS_EXT_STRUCT(MRef, AbsMF, CONSTANT_Methodref)
-            DEF_ABS_EXT_STRUCT(IMRef, AbsMF, CONSTANT_InterfaceMethodref)
-            DEF_ABS_EXT_STRUCT(Module, AbsMP, CONSTANT_Module)
-            DEF_ABS_EXT_STRUCT(Package, AbsMP, CONSTANT_Package)
-            DEF_ABS_EXT_STRUCT(Dynamic, AbsDynamic, CONSTANT_Dynamic)
-            DEF_ABS_EXT_STRUCT(IDynamic, AbsDynamic, CONSTANT_InvokeDynamic)
-        } // namespace spec
+        struct CustomUtf8 : parser::common::SerCombinatorPMxn<CustomUtf8, parser::common::RawAnyJaacSpan<>> {
+            parser::common::RawAnyJaacSpan<> span{};
+
+            DEF_TAG_FLAG(CONSTANT_Utf8)
+
+            explicit constexpr CustomUtf8(const parser::common::RawAnyJaacSpan<> span) noexcept :
+                span(span) {
+            }
+
+            constexpr CustomUtf8() noexcept = default;
+
+            template <typename SpecW>
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                span.deser(writePtr);
+                return {};
+            }
+
+            NODISCARD std::string to_str() const noexcept {
+                return {span.begin(), span.end()};
+            }
+        };
     } // namespace inst
 
     namespace traits {
-        using Integer = inst::spec::PrInt;
-        using Float = inst::spec::PrFloat;
-        using Long = inst::spec::PrLong;
-        using Double = inst::spec::PrDouble;
+        using Integer = inst::Primitive<opcodes::TagIdEnum::CONSTANT_Integer, parser::wrappers::JInt>;
+        using Float = inst::Primitive<opcodes::TagIdEnum::CONSTANT_Float, parser::wrappers::JFloat>;
+        using Long = inst::Primitive<opcodes::TagIdEnum::CONSTANT_Long, parser::wrappers::JLong>;
+        using Double = inst::Primitive<opcodes::TagIdEnum::CONSTANT_Double, parser::wrappers::JDouble>;
         using Class = inst::Class;
         using String = inst::String;
         using MethodHandle = inst::MethodHandle;
         using MethodType = inst::MethodType;
-        using Dynamic = inst::spec::Dynamic;
-        using Utf8 = inst::Utf8<>;
-        using Fieldref = inst::spec::FRef;
-        using Methodref = inst::spec::MRef;
-        using InterfaceMethodref = inst::spec::IMRef;
+        using Dynamic = inst::Dynamic<opcodes::TagIdEnum::CONSTANT_Dynamic>;
+        using Utf8 = inst::SourceUtf8;
+        using Fieldref = inst::MF<opcodes::TagIdEnum::CONSTANT_Fieldref>;
+        using Methodref = inst::MF<opcodes::TagIdEnum::CONSTANT_Methodref>;
+        using InterfaceMethodref = inst::MF<opcodes::TagIdEnum::CONSTANT_InterfaceMethodref>;
         using NameAndType = inst::NameAndType;
-        using InvokeDynamic = inst::spec::IDynamic;
-        using Module = inst::spec::Module;
-        using Package = inst::spec::Package;
+        using InvokeDynamic = inst::Dynamic<opcodes::TagIdEnum::CONSTANT_InvokeDynamic>;
+        using Module = inst::MP<opcodes::TagIdEnum::CONSTANT_Module>;
+        using Package = inst::MP<opcodes::TagIdEnum::CONSTANT_Package>;
 
-        using Utf8Custom = inst::Utf8<true>;
+        using Utf8Custom = inst::CustomUtf8;
 
         struct EmptyVarValue {};
 
@@ -279,19 +323,11 @@ export namespace cp_consts {
 
         using VariantAllUnempty = All::Append<Utf8Custom>;
         using VariantAll = VariantAllUnempty::Prepend<EmptyVarValue>;
-
-        using variant = VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr>;
-
-        using opt_variant = cstd::var_opt<variant>;
-
-        // ReSharper disable once CppPassValueParameterByConstReference
-        std::string variant_to_str(const variant var) noexcept { // NOLINT(*-unnecessary-value-param)
-            return var.deref_visit([]<typename Type>(Type&& value) -> std::string { return value.to_str(); });
-        }
     } // namespace traits
 
     template <typename LambdaRetType>
-    auto switch_tag_id_enum_2compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_2compl(const opcodes::TagIdEnum tagId,
+                                                                      auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Float, Float);
@@ -311,12 +347,13 @@ export namespace cp_consts {
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Module, Module);
             SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Package, Package);
             [[unlikely]] default:
-                return std::optional<LambdaRetType>{std::nullopt};
+                return std::nullopt;
         }
     }
 
     template <typename LambdaRetType>
-    auto switch_tag_id_enum_1compl_1rt(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_1compl_1rt(const opcodes::TagIdEnum tagId,
+                                                                          auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Float, Float);
@@ -336,12 +373,13 @@ export namespace cp_consts {
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Module, Module);
             SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Package, Package);
             [[unlikely]] default:
-                return std::optional<LambdaRetType>{std::nullopt};
+                return std::nullopt;
         }
     }
 
     template <typename LambdaRetType>
-    auto switch_tag_id_enum_1compl(const opcodes::TagIdEnum tagId, auto&& callable) noexcept {
+    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_1compl(const opcodes::TagIdEnum tagId,
+                                                                      auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Integer);
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Float);
@@ -361,11 +399,11 @@ export namespace cp_consts {
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Module);
             SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Package);
             [[unlikely]] default:
-                return std::optional<LambdaRetType>{std::nullopt};
+                return std::nullopt;
         }
     }
 
-    constexpr std::optional<std::string_view> tag_to_str_view(const opcodes::TagIdEnum tagId) noexcept {
+    CPP_KOSTYL constexpr std::optional<std::string_view> tag_to_str_view(const opcodes::TagIdEnum tagId) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN_TO_STR_V(Integer);
             SWITCH_TAG_CASE_GEN_TO_STR_V(Float);
@@ -391,10 +429,92 @@ export namespace cp_consts {
 
     std::string tag_to_str(const opcodes::TagIdEnum tagId) noexcept {
         const auto name = tag_to_str_view(tagId);
-        return name ? static_cast<std::string>(*name) : "NA: " + std::to_string(static_cast<opcodes::TagIdType>(tagId));
+        return name ? static_cast<std::string>(*name)
+                    : "NA: " + std::to_string(static_cast<opcodes::TagIdEnumType>(tagId));
     }
 
     std::ostream& operator<<(std::ostream& stream, const opcodes::TagIdEnum tagId) {
         return stream << tag_to_str(tagId);
+    }
+
+    template <bool handle = false, typename SpecR>
+    bool parse1_const_big_ctx(parser::ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept;
+
+    namespace traits {
+        struct cp_var : VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr> {
+            template <typename SpecR>
+            NODISCARD static cstd::var_opt<cp_var> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                cp_var var;
+                if (!parse1_const_big_ctx<true>(readPtr, [&](TagIdTypeT, const cp_var& value) { var = value; }))
+                    return {};
+                return var;
+            }
+
+            template <typename SpecR>
+            NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                return parse1_const_big_ctx<false>(readPtr, [](TagIdTypeT) {});
+            }
+
+            template <typename SpecW, bool unlikely = false>
+            NODISCARD gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) noexcept {
+                if constexpr (CPP_KOSTYL unlikely) {
+                    if (is_holds_empty()) [[unlikely]] {
+                        return {};
+                    }
+                } else {
+                    if (is_holds_empty()) {
+                        return {};
+                    }
+                }
+                deref_visit([&writePtr]<typename DirSelf>(DirSelf&& self) {
+                    using Self = std::remove_cvref_t<DirSelf>;
+                    Self::TAG_ID.deser(writePtr);
+                    self.deser(writePtr);
+                });
+                return {};
+            }
+        };
+
+        using opt_cp_var = cstd::var_opt<cp_var>;
+
+        // ReSharper disable once CppPassValueParameterByConstReference
+        std::string variant_to_str(const cp_var var) noexcept { // NOLINT(*-unnecessary-value-param)
+            return var.is_holds_empty() ? var.deref_visit([](auto&& value) -> std::string { return value.to_str(); })
+                                        : std::string{"EMPTY"};
+        }
+    } // namespace traits
+
+    template <bool handle = false, typename SpecR>
+    bool parse1_const_big_ctx(parser::ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept {
+        DEF_OR_ELSE_RET_FALSE(TagIdTypeT, tagId);
+
+        const auto handle_lambda = [&readPtr] {
+            if constexpr (handle) {
+                return [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> traits::opt_cp_var {
+                    if (auto value = Trait::parse(readPtr)) {
+                        return {{*value}};
+                    }
+                    return {};
+                };
+            } else {
+                return [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> bool {
+                    return Trait::check_and_move(readPtr);
+                };
+            }
+        }();
+
+        auto result = cp_consts::switch_tag_id_enum_2compl<std::conditional_t<handle, traits::opt_cp_var, bool>>(
+                tagId, handle_lambda);
+
+        DEF_ASSERT_FALSE(result);
+        DEF_ASSERT_FALSE(*result);
+
+        if constexpr (handle) {
+            handler(tagId, **result);
+        } else {
+            handler(tagId);
+        }
+
+        return false;
     }
 } // namespace cp_consts
