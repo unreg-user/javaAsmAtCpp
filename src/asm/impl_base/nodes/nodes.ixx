@@ -21,7 +21,7 @@ export namespace nodes {
             bool useWrite;
             bool handleVersion, handleAccess, deepHandleThisClassIdx, handleSuperClassIdx = false;
             bool parseCpoolStructure = false;
-            parser::HandleMode handleModeCpool, handleModeIfaces, handleModeFields, handleModeAttrs = parser::HandleMode::NONE;
+            parser::HandleMode handleModeCpool, handleModeIfaces, handleModeFields, handleModeMethods, handleModeAttrs = parser::HandleMode::NONE;
             parser::ParseLength parseLength = parser::ParseLength::FULL;
         };
 
@@ -35,6 +35,7 @@ export namespace nodes {
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeCpool)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeIfaces)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeFields)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeMethods)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeAttrs)
             PUBLIC_V_GENERIC_R_AT(parseFlags, parseCpoolStructure)
             PUBLIC_V_GENERIC_R_AT(parseFlags, parseLength)

@@ -18,6 +18,7 @@ import cp_consts;
 import costd;
 import compl_flags;
 import parser_concepts;
+import gstd;
 
 using namespace parser;
 using namespace common;
@@ -26,17 +27,27 @@ using namespace nodes::templ;
 using namespace cp_consts::traits;
 
 // ReSharper disable once CppUseInternalLinkage
-struct ClassN1 : ClearClassN<ParseFlags{.useWrite = false, // NOLINT(*-pro-type-member-init)
-                                        .parseCpoolStructure = true,
-                                        .handleModeCpool = HandleMode::FULL,
-                                        .handleModeIfaces = HandleMode::FULL,
-                                        .handleModeFields = HandleMode::FULL,
-                                        .handleModeAttrs = HandleMode::FULL}> {
-    def::MakeHasParseSize<JaacVector<cp_var>> cpool{};
-    JaacVector<CpoolSizeT> ifaces{};
-    JaacVector<MFInfo<>> fields{}, methods{};
-    JaacVector<FullAttribute<>> attrs{};
+
+template <typename Base>
+struct TestMxn : Base {
+    using Base::Base;
 };
+
+namespace {
+    struct ClassN1 : ClearClassN<ParseFlags{.useWrite = false, // NOLINT(*-pro-type-member-init)
+                                            .parseCpoolStructure = true,
+                                            .handleModeCpool = HandleMode::FULL,
+                                            .handleModeIfaces = HandleMode::FULL,
+                                            .handleModeFields = HandleMode::FULL,
+                                            .handleModeMethods = HandleMode::FULL,
+                                            .handleModeAttrs = HandleMode::FULL,
+                                            .parseLength = ParseLength::FULL}> {
+        def::MakeHasParseSize<JaacVector<cp_var>> cpool{};
+        JaacVector<CpoolSizeT> ifaces{};
+        JaacVector<MFInfo<>> fields{}, methods{};
+        JaacVector<FullAttribute<>> attrs{};
+    };
+} // namespace
 
 int main() {
     constexpr auto path = reader::PreRWFileData{"D:/you_p_only/cpp_elems/javaAsmAtCpp/test/test.class"};
@@ -48,5 +59,5 @@ int main() {
         std::cerr << "Test failed: " << static_cast<uint32_t>(result.error()) << std::endl;
     }
 
-    //auto result6 = parser::parse<nodes::full::EmptyClassN<{.useWrite = false}>>(path);
+    // auto result6 = parser::parse<nodes::full::EmptyClassN<{.useWrite = false}>>(path);
 }

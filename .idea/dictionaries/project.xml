@@ -29,6 +29,7 @@
       <w>checkcast</w>
       <w>cpool</w>
       <w>daload</w>
+      <w>dassert</w>
       <w>dastore</w>
       <w>dcmpg</w>
       <w>dcmpl</w>

@@ -289,10 +289,6 @@ export namespace parser::common {
             return readPtr.i;
         }
 
-        NODISCARD u8_ptr get_last_sym_ptr() const noexcept {
-            return --get_end_ptr();
-        }
-
         NODISCARD SizeT typed_size() const noexcept {
             return *SizeT::parse(get_size_read_ptr());
         }
@@ -342,7 +338,7 @@ export namespace parser::common {
         template <typename SpecW>
             requires JaacDeserable<SizeT, SpecW>
         NODISCARD gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) const noexcept {
-            writePtr.deser_range(UncheckedReadPtr{get_after_size_ptr(), get_last_sym_ptr()});
+            writePtr.deser_range(UncheckedReadPtr{get_after_size_ptr(), get_end_ptr()});
             return {};
         }
     };

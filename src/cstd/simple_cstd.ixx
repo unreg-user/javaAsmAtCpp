@@ -290,4 +290,30 @@ export namespace cstd {
     struct ApplyP : Base, PMixins... {
         using Base::Base;
     };
+
+    template <typename Base>
+    struct NoneWMxn : Base {
+        using Base::Base;
+
+        /*implicit*/ NoneWMxn(Base& base) : Base(base) {
+        }
+        /*implicit*/ NoneWMxn(Base&& base) : Base(base) {
+        }
+
+        /*implicit*/ operator Base&() & {
+            return static_cast<Base&>(*this);
+        }
+
+        /*implicit*/ operator Base&&() && {
+            return static_cast<Base&&>(*this);
+        }
+
+        /*implicit*/ operator const Base&() const & {
+            return static_cast<const Base&>(*this);
+        }
+
+        /*implicit*/ operator const Base&&() const && {
+            return static_cast<const Base&&>(*this);
+        }
+    };
 } // namespace cstd

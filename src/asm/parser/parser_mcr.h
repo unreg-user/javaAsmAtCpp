@@ -114,9 +114,9 @@
 #define DEF_CHECK_METHOD_EXISTS(name) CHECK_METHOD_EXISTS(classNode, name)
 #define DEF_CHECK_FIELD_EXISTS(name) CHECK_FIELD_EXISTS(classNode, name)
 
-#define DEF_ASSERT_UNEX(bl) { bool timed_bl_result = static_cast<bool>(bl); assert(timed_bl_result); if (!timed_bl_result) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
-#define DEF_ASSERT_INVALID(bl) { bool timed_bl_result = static_cast<bool>(bl); assert(timed_bl_result); if (!timed_bl_result) [[unlikely]] return ParseErr::INVALID; }
-#define DEF_ASSERT_FALSE(bl) { bool timed_bl_result = static_cast<bool>(bl); assert(timed_bl_result); if (!timed_bl_result) [[unlikely]] return false; }
+#define DEF_ASSERT_UNEX(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
+#define DEF_ASSERT_INVALID(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return ParseErr::INVALID; }
+#define DEF_ASSERT_FALSE(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return false; }
 
 #define DEF_OR_ELSE_OPT_UNEX(type, name) OR_ELSE_OPT_UNEX(type, name, type::parse(readPtr), ParseErr::INVALID)
 #define DEF_OR_ELSE_OPT_INVALID(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return ParseErr::INVALID;)

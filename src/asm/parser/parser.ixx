@@ -141,7 +141,7 @@ export namespace parser {
                                            [&](const opcodes::TagIdEnum tagId) {
                                                if constexpr (!parseCpoolStructureFlag && hasCorrectCpool)
                                                    is_unex = !classNode.cpool.jaac_push_back(
-                                                           static_cast<u8_span>(UncheckedReadPtr{iOld, readPtr.i - 1}));
+                                                           static_cast<u8_span>(UncheckedReadPtr{iOld, readPtr.i}));
                                                skipLDIdx(tagId);
                                            }});
                     DEF_ASSERT_UNEX(!is_unex)
@@ -187,19 +187,19 @@ export namespace parser {
 
                 if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
                     DEF_OPT_ARRAY_HANDLE(fields, Fields, fields,
-                                         { parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size); });
+                                         { DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size)); });
 
 
                     if constexpr (parseLengthFlag >= ParseLength::METHODS) {
                         DEF_OPT_ARRAY_HANDLE(methods, Methods, methods, {
-                            parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size);
+                            DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size));
                         });
 
 
                         if constexpr (parseLengthFlag >= ParseLength::FULL) {
                             DEF_OPT_ARRAY_HANDLE(attrs, Attrs, attrs, {
-                                parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
-                                        readPtr, classNode.attrs, attrs_size);
+                                DEF_ASSERT_UNEX(parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
+                                        readPtr, classNode.attrs, attrs_size));
                             });
                         }
                     }

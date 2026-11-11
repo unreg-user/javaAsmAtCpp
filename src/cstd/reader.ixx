@@ -129,30 +129,30 @@ export namespace reader {
     template <typename Sym, typename FlagsStruct = ReadPtrDefaultFlagsStruct>
     struct ReadPtr {
         Sym* i;
-        Sym* last;
+        Sym* endPtr;
 
-        /*implicit*/ ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), last(data.data + data.size - 1) {
+        /*implicit*/ ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), endPtr(data.data + data.size) {
         }
 
-        /*implicit*/ ReadPtr(std::span<Sym> data) noexcept : i(data.data()), last(data.data() + data.size() - 1) {
+        /*implicit*/ ReadPtr(std::span<Sym> data) noexcept : i(data.data()), endPtr(data.data() + data.size()) {
         }
 
-        ReadPtr(Sym* i, Sym* last) noexcept : i(i), last(last) {
+        ReadPtr(Sym* i, Sym* end) noexcept : i(i), endPtr(end) {
         }
 
-        ReadPtr(const ReadPtr& other) noexcept : i(other.i), last(other.last) {
+        ReadPtr(const ReadPtr& other) noexcept : i(other.i), endPtr(other.endPtr) {
         }
 
-        ReadPtr(ReadPtr&& other) noexcept : i(other.i), last(other.last) {
+        ReadPtr(ReadPtr&& other) noexcept : i(other.i), endPtr(other.endPtr) {
         }
 
         FAKE_TEMPL requires (!FlagsStruct::CheckMemorySize)
-        explicit ReadPtr(Sym* i) noexcept : i(i), last(nullptr) {
+        explicit ReadPtr(Sym* i) noexcept : i(i), endPtr(nullptr) {
         }
 
         ReadPtr cpyWithSizeSymbols(const size_t size) {
             if constexpr (FlagsStruct::CheckMemorySize)
-                assert(i + size <= last);
+                assert(i + size < endPtr);
             return {i, i + size};
         }
 
@@ -162,9 +162,9 @@ export namespace reader {
         }
 
         auto readSpan() {
-            assert(i <= last);
-            auto span = std::span<Sym>{i, static_cast<size_t>(last - i)};
-            i = last;
+            assert(i <= endPtr);
+            auto span = std::span<Sym>{i, static_cast<size_t>(endPtr - i)};
+            i = endPtr;
             return span;
         }
 
@@ -174,7 +174,7 @@ export namespace reader {
             static constexpr auto typeS = sizeof(Type) / sizeof(Sym);
 
             if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + typeS <= last)) [[unlikely]] {
+                if (!(i + typeS <= endPtr)) [[unlikely]] {
                     return false;
                 }
             }
@@ -214,7 +214,7 @@ export namespace reader {
 
         NODISCARD F_INLINE bool check_and_move_symbols(size_t symbols) noexcept {
             if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + symbols <= last)) [[unlikely]] {
+                if (!(i + symbols <= endPtr)) [[unlikely]] {
                     return false;
                 }
             }
@@ -231,7 +231,7 @@ export namespace reader {
         template <size_t symbols>
         NODISCARD F_INLINE bool check_and_move_symbols() noexcept {
             if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + symbols <= last)) [[unlikely]] {
+                if (!(i + symbols <= endPtr)) [[unlikely]] {
                     return false;
                 }
             }
@@ -257,8 +257,8 @@ export namespace reader {
         }
 
         Sym* end() const noexcept {
-            assert(last);
-            return last + 1;
+            assert(endPtr);
+            return endPtr;
         }
 
         Sym* cbegin() const noexcept {
@@ -266,8 +266,8 @@ export namespace reader {
         }
 
         Sym* cend() const noexcept {
-            assert(last);
-            return last + 1;
+            assert(endPtr);
+            return endPtr;
         }
 
         /*implicit*/ operator std::span<Sym>() const noexcept {

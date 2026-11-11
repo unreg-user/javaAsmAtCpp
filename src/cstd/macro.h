@@ -2,6 +2,8 @@
 
 // clang-format off
 
+#include <ostream>
+
 #define NODISCARD [[nodiscard]]
 #define DEPRECATED(text) [[deprecated(text)]]
 #define K1 template <typename> typename
@@ -59,6 +61,27 @@
 CPP_KOSTYL // that it is not kw
 #define COM static constexpr
 #define REQ_REQ(...) requires { requires __VA_ARGS__; }
+
+namespace std {
+    _EXPORT_STD extern "C++" __PURE_APPDOMAIN_GLOBAL _CRTDATA2_IMPORT ostream cerr;
+}
+
+namespace macro_internal {
+    inline void _dassert(const char* expr, const char* file, const unsigned int line, const char* msg) {
+        std::cerr << "Assertion failed: (" << expr << "), file " << file
+                  << ", line " << line;
+        if (msg && msg[0] != '\0') {
+            std::cerr << ", with message: " << msg;
+        }
+        std::cerr << std::endl;
+        std::abort();
+    }
+}
+
+#define dassert(expression, ...) \
+    ((void)( \
+        (!!(expression)) ? 0 : (macro_internal::_dassert(#expression, __FILE__, (unsigned)(__LINE__), "" __VA_OPT__(__VA_ARGS__)), 0) \
+    ))
 
 /*
 #include <utility>

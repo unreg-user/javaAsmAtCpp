@@ -13,6 +13,7 @@ import read_utils;
 import parser_concepts;
 import parser_wrappers_b2;
 import parser_b2;
+import simple_cstd;
 
 export namespace parser {
     template <typename T, bool skip0 = false>
@@ -89,7 +90,7 @@ export namespace parser {
             return {nullptr, nullptr};
         if (!readPtr.check_memory_and_move(length)) [[unlikely]]
             return {nullptr, nullptr};
-        readPtr2.last = readPtr.i - 1;
+        readPtr2.endPtr = readPtr.i - 1;
         return readPtr2;
     }
 
@@ -100,7 +101,7 @@ export namespace parser {
     }
 
     template <bool shouldHasCorrectCollection, typename ElemT, typename SpecR>
-    bool parse_simple_collection(ReadPtrBySpec<SpecR> readPtr, auto&& array, const wrappers::ArraySizeT mf_size) {
+    bool parse_simple_collection(ReadPtrBySpec<SpecR>& readPtr, auto&& array, const wrappers::ArraySizeT mf_size) {
         for (ArrayRSizeT i = 0; i < static_cast<ArrayRSizeT>(mf_size); ++i) {
             if constexpr (shouldHasCorrectCollection) {
                 auto opt_elem = ElemT::parse(readPtr);
@@ -109,14 +110,14 @@ export namespace parser {
                 }
                 DEF_ASSERT_FALSE(array.jaac_emplace_back(std::move(*opt_elem)));
             } else {
-                DEF_ASSERT_FALSE(ElemT::check_and_move(readPtr))
+                DEF_ASSERT_FALSE(ElemT::check_and_move(readPtr));
             }
         }
         return true;
     }
 
     template <bool shouldHasCorrectCollection, typename SpecR>
-    bool parse_MF(ReadPtrBySpec<SpecR> readPtr, auto&& array, wrappers::ArraySizeT mf_size) {
+    bool parse_MF(ReadPtrBySpec<SpecR>& readPtr, auto&& array, wrappers::ArraySizeT mf_size) {
         return parse_simple_collection<shouldHasCorrectCollection, common::MFInfo<>, SpecR>(readPtr, array, mf_size);
     }
 } // namespace parser
