@@ -1353,3 +1353,168 @@ struct ClassN6 {
 
     //template <KN Container, typename... Types>
     //using SerCombinatorPMxnBy = SerCombinatorPMxn<Container<Types...>, Types...>;
+#define DEF_FULL_HANDLE(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_HANDLE(type, name); if constexpr (useWriteFlag) {defBackAddingLambda1(name)}
+    static_assert(!timed_b_2 || requires { { classNode.path.jaac_convert_to_##name(); } -> std::same_as<timed_b_2> }, "Invalid type of field "#path" (not convertable to "#name")"); \
+
+
+    template <typename LambdaRetType>
+    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_2compl(const opcodes::TagIdEnum tagId,
+                                                                      auto&& callable) noexcept {
+        switch (tagId) {
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Float, Float);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Long, Long);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Double, Double);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Class, Class);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_String, String);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_MethodHandle, MethodHandle);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_MethodType, MethodType);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Dynamic, Dynamic);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Utf8, Utf8);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Fieldref, Fieldref);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Methodref, Methodref);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref, InterfaceMethodref);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_NameAndType, NameAndType);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_InvokeDynamic, InvokeDynamic);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Module, Module);
+            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Package, Package);
+            [[unlikely]] default:
+                return std::nullopt;
+        }
+    }
+
+
+    template <typename LambdaRetType>
+    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_1compl(const opcodes::TagIdEnum tagId,
+                                                                      auto&& callable) noexcept {
+        switch (tagId) {
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Integer);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Float);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Long);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Double);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Class);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_String);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_MethodHandle);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_MethodType);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Dynamic);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Utf8);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Fieldref);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Methodref);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_NameAndType);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_InvokeDynamic);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Module);
+            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Package);
+            [[unlikely]] default:
+                return std::nullopt;
+        }
+    }
+
+
+
+
+    template <bool hasNullptr = false, typename... DerefTypes>
+    struct variant_of_ptrs : deref_to_ref_variant<hasNullptr, DerefTypes...> {
+        using deref_to_ref_variant<hasNullptr, DerefTypes...>::deref_to_ref_variant;
+
+        NODISCARD constexpr void* get_raw_ptr() const noexcept {
+            return std::visit([](auto self) { return static_cast<void*>(self); }, *this);
+        }
+
+        constexpr void destruct_deref() const noexcept {
+            std::visit(overload{[](const auto* self) { delete self; }, [](const nullptr_t) {}}, *this);
+        }
+
+        constexpr auto deref_visit_with_nullptr(auto&& callable, auto&& null_callable) const noexcept {
+            return std::visit(
+                    overload{[&](auto* self) { return callable(*self); }, [&](nullptr_t) { return null_callable(); }},
+                    *this);
+        }
+
+        template <typename Callable>
+        constexpr auto deref_visit(Callable&& callable) const noexcept {
+            using Ret = dstd::call::MakeCallableTraits<Callable>::RetT;
+            return deref_visit_with_nullptr(std::forward<Callable>(callable), []() -> Ret {
+                assert(false);
+                // ReSharper disable once CppFunctionDoesntReturnValue
+            });
+        }
+
+        template <typename DerefType>
+        NODISCARD constexpr auto is_holds_alternative_ref() const noexcept {
+            return std::holds_alternative<DerefType*>(*this);
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const variant_of_ptrs& self) {
+            os << "vptr<" << self.index() << ">";
+            std::visit(overload{[&](auto* selfVal) {
+                                    os << "(";
+                                    selfVal->operatorKK(os);
+                                    os << ")";
+                                },
+                                [](nullptr_t) {}},
+                       self);
+            return os;
+        }
+    };
+
+    template <typename DerefEmptyType, typename... DerefTypes>
+    struct variant_of_emptiable_ptrs : variant_of_ptrs<false, DerefEmptyType, DerefTypes...>,
+                                       mixins::emptiable_variant_of_ptrs_mixin<DerefEmptyType> {
+        using variant_of_ptrs<true, DerefTypes...>::variant_of_ptrs;
+    };
+
+    template <typename... DerefTypes>
+    struct variant_of_nullable_ptrs : variant_of_ptrs<true, DerefTypes...>, mixins::nullable_variant_of_ptrs_mixin<> {
+        using variant_of_ptrs<true, DerefTypes...>::variant_of_ptrs;
+    };
+
+    template <typename DerefEmptyType, typename... DerefTypes>
+    struct variant_of_nullable_emptiable_ptrs : variant_of_nullable_ptrs<DerefEmptyType, DerefTypes...>,
+                                                mixins::emptiable_nullable_variant_of_ptrs_mixin<DerefEmptyType> {
+        using variant_of_nullable_ptrs<DerefEmptyType, DerefTypes...>::variant_of_nullable_ptrs;
+    };
+
+
+
+        template <typename BigC, typename SmallC>
+        constexpr auto sep_visit(BigC&& bigC, BigC&& smallC) const noexcept {
+            return std::visit(emp_ignore_in_visit_lambda(overload{
+                                      [&bigC](const auto* self) { return std::forward<BigC>(bigC)(self); },
+                                      [&smallC](const auto self) { return std::forward<SmallC>(smallC)(self); }}),
+                              *this);
+        }
+
+        template <typename DerefEmptyType, size_t nullTypeIdx = 0, size_t emptyTypeIdx = 1>
+        struct emptiable_nullable_variant_of_ptrs_mixin : emptiable_variant_of_ptrs_mixin<DerefEmptyType, emptyTypeIdx>,
+                                                          nullable_variant_of_ptrs_mixin<nullTypeIdx> {
+            NODISCARD constexpr bool is_emptnull(this auto&& self) noexcept {
+                return self.is_null() || self.is_empty();
+            }
+
+            NODISCARD constexpr bool is_not_emptnull(this auto&& self) noexcept {
+                return !self.is_emptnull();
+            }
+        };
+
+        template <size_t nullTypeIdx = 0>
+        struct nullable_variant_of_ptrs_mixin {
+            static constexpr size_t nullIdx = nullTypeIdx;
+
+            NODISCARD constexpr bool is_null(this auto&& self) noexcept {
+                return self.index() == nullTypeIdx;
+            }
+
+            NODISCARD constexpr bool is_not_null(this auto&& self) noexcept {
+                return !self.is_null();
+            }
+        };
+
+        template <typename DerefEmptyType, size_t emptyTypeIdx = 0>
+        struct emptiable_variant_of_ptrs_mixin : emptiable_variant_mixin<DerefEmptyType*, emptyTypeIdx> {
+            using DerefEmptyT = DerefEmptyType;
+        };
+
+template <bool hasNullptr = false, typename... DerefTypes>
+using deref_to_ref_variant =
+        std::conditional_t<hasNullptr, std::variant<nullptr_t, DerefTypes*...>, std::variant<DerefTypes*...>>;

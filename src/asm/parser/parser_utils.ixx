@@ -27,9 +27,8 @@ export namespace parser {
 
     using ArrayRSizeT = uint16_t;
     using CpoolRSizeT = ArrayRSizeT;
-    using IfacesRSizeT = uint16_t;
     using RawAccessFlagsT = uint16_t;
-    using AttrsRSizeT = uint32_t;
+    using AttrsInnerRSizeT = uint32_t;
 
     using u8_ptr = uint8_t*;
     using u8_span = std::span<uint8_t>;

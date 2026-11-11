@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -28,21 +29,18 @@ using namespace cp_consts::traits;
 
 // ReSharper disable once CppUseInternalLinkage
 
-template <typename Base>
-struct TestMxn : Base {
-    using Base::Base;
+struct Cpool : def::MakeHasParseSize<JaacVector<cp_var>> {
 };
 
 namespace {
-    struct ClassN1 : ClearClassN<ParseFlags{.useWrite = false, // NOLINT(*-pro-type-member-init)
-                                            .parseCpoolStructure = true,
+    struct ClassN1 : ClearClassN<ParseFlags{.parseCpoolStructure = true,
                                             .handleModeCpool = HandleMode::FULL,
                                             .handleModeIfaces = HandleMode::FULL,
                                             .handleModeFields = HandleMode::FULL,
                                             .handleModeMethods = HandleMode::FULL,
                                             .handleModeAttrs = HandleMode::FULL,
                                             .parseLength = ParseLength::FULL}> {
-        def::MakeHasParseSize<JaacVector<cp_var>> cpool{};
+        Cpool cpool{};
         JaacVector<CpoolSizeT> ifaces{};
         JaacVector<MFInfo<>> fields{}, methods{};
         JaacVector<FullAttribute<>> attrs{};
@@ -50,14 +48,19 @@ namespace {
 } // namespace
 
 int main() {
-    constexpr auto path = reader::PreRWFileData{"D:/you_p_only/cpp_elems/javaAsmAtCpp/test/test.class"};
-    if (auto result = parser::parse<ClassN1>(path)) {
-        auto [node, flag] = result->to_pair();
-        int d = 0;
-        // ReadPtrBySpec<cflags::class_file_ptr> r{nullptr, nullptr};
-    } else {
-        std::cerr << "Test failed: " << static_cast<uint32_t>(result.error()) << std::endl;
+    const auto start = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < 1; ++i) {
+        constexpr auto path = reader::PreRWFileData{"D:/you_p_only/cpp_elems/javaAsmAtCpp/test/test.class"};
+        if (auto result = parser::parse<ClassN1>(path)) {
+            auto [node, flag] = result->to_pair();
+            int d = 0;
+            // ReadPtrBySpec<cflags::class_file_ptr> r{nullptr, nullptr};
+        } else {
+            std::cerr << "Test failed: " << static_cast<uint32_t>(result.error()) << std::endl;
+        }
     }
+    const auto end = std::chrono::high_resolution_clock::now();
+    std::cout << end - start;
 
-    // auto result6 = parser::parse<nodes::full::EmptyClassN<{.useWrite = false}>>(path);
+    // auto result6 = parser::parse<nodes::full::EmptyClassN<{.useWrite = true}>>(path);
 }

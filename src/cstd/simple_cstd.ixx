@@ -165,11 +165,11 @@ export namespace cstd {
     };
 
     template <typename Callable>
-    struct _func_or_false_line_Handler {
+    struct FuncOrFalseLineHandler {
         Callable callable;
 
         template <typename Callable2>
-        auto constexpr operator|(_func_or_false_line_Handler<Callable2> call2Cont) {
+        auto constexpr operator|(FuncOrFalseLineHandler<Callable2> call2Cont) {
             if constexpr (std::same_as<Callable, bool>) {
                 return call2Cont;
             } else {
@@ -180,7 +180,7 @@ export namespace cstd {
                         callable();
                         call2Cont.callable();
                     };
-                    return _func_or_false_line_Handler<decltype(l)>{l};
+                    return FuncOrFalseLineHandler<decltype(l)>{l};
                 }
             }
         }
@@ -189,15 +189,26 @@ export namespace cstd {
     template <typename... Callables>
     constexpr auto func_or_false_line(Callables... callables) {
         if constexpr (sizeof...(Callables) > 0) {
-            return (... | _func_or_false_line_Handler{callables}).callable;
+            return (... | FuncOrFalseLineHandler{callables}).callable;
         } else {
             return false;
         }
     }
 
-    template <typename... Callables>
-    constexpr void call(Callables&&... callables) {
-        (..., callables());
+    template <typename Callable>
+    struct NoFalseCaller {
+        Callable& callable;
+
+        void constexpr operator*() const {
+            if constexpr (!std::same_as<std::remove_cvref_t<Callable>, bool>) {
+                callable();
+            }
+        }
+    };
+
+    template <typename Callable>
+    constexpr void call_if_no_false(Callable&& callable) {
+        *NoFalseCaller{callable};
     }
 
     template <bool Cond, typename T>
@@ -315,5 +326,13 @@ export namespace cstd {
         /*implicit*/ operator const Base&&() const && {
             return static_cast<const Base&&>(*this);
         }
+    };
+    
+    template <bool Cond, typename T>
+    struct OrEmpty {
+    };
+
+    template <typename T>
+    struct OrEmpty<true, T> : T {
     };
 } // namespace cstd

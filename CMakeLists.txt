@@ -25,7 +25,7 @@ target_sources(javaAsmAtCpp
         PUBLIC
         src/asm/parser/parser_mcr.h
         src/asm/impl_base/cp_consts_mcr.h
-        src/asm/impl_base/insns_mcr.h
+        src/asm/parser/mcode/insns_mcr.h
         src/asm/opcodes_mcr.h
 
         PUBLIC
@@ -47,7 +47,7 @@ target_sources(javaAsmAtCpp
         src/cstd/costd.ixx
         src/asm/opcodes.ixx
         src/asm/impl_base/nodes/nodes.ixx
-        src/asm/impl_base/insns.ixx
+        src/asm/parser/mcode/insns.ixx
         src/asm/parser/parser.ixx
         src/asm/impl_base/cp_consts.ixx
         src/asm/parser/parser_utils.ixx
@@ -57,5 +57,6 @@ target_sources(javaAsmAtCpp
         src/asm/parser/base_classes/parser_b1.ixx
         src/asm/parser/base_classes/parser_b2.ixx
         src/asm/parser/base_classes/parser_wrappers_b2.ixx
+        src/asm/parser/mcode/code_attr.ixx
         src/compl_flags.ixx
 )

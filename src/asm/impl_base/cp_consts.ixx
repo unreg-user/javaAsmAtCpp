@@ -31,7 +31,7 @@ export namespace cp_consts {
     namespace inst {
         template <opcodes::TagIdEnum tag, typename Prim, typename RawPrim = gstd::GetWidstructDefBaser<Prim>::Result>
         struct Primitive : parser::common::SerCombinatorPMxn<Primitive<tag, Prim, RawPrim>, Prim> {
-            Prim value;
+            Prim value{};
 
             TAG_FLAG(tag);
 
@@ -51,8 +51,8 @@ export namespace cp_consts {
             }
         };
 
-        struct Class : parser::common::SerCombinatorPMxn<Class, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT classIdx;
+        struct Class : parser::common::SerCombinatorPMxn<Class, SizeT> {
+            SizeT classIdx{};
 
             explicit constexpr Class(const SizeT v) noexcept : classIdx(v) {
             }
@@ -67,15 +67,15 @@ export namespace cp_consts {
 
             template <typename SpecW>
             gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
-                reader::utils::deser_rev(writePtr, classIdx);
+                classIdx.deser(writePtr);
                 return {};
             }
         };
 
         template <opcodes::TagIdEnum tag>
-        struct MF : parser::common::SerCombinatorPMxn<MF<tag>, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT classIdx;
-            SizeT nameAndTypeIdx;
+        struct MF : parser::common::SerCombinatorPMxn<MF<tag>, SizeT, SizeT> {
+            SizeT classIdx{};
+            SizeT nameAndTypeIdx{};
 
             TAG_FLAG(tag)
 
@@ -98,8 +98,8 @@ export namespace cp_consts {
             }
         };
 
-        struct String : parser::common::SerCombinatorPMxn<String, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT stringIdx;
+        struct String : parser::common::SerCombinatorPMxn<String, SizeT> {
+            SizeT stringIdx{};
 
             DEF_TAG_FLAG(CONSTANT_String)
 
@@ -120,8 +120,8 @@ export namespace cp_consts {
         };
 
         template <opcodes::TagIdEnum tag>
-        struct MP : parser::common::SerCombinatorPMxn<MP<tag>, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT nameIdx;
+        struct MP : parser::common::SerCombinatorPMxn<MP<tag>, SizeT> {
+            SizeT nameIdx{};
 
             TAG_FLAG(tag)
 
@@ -142,8 +142,8 @@ export namespace cp_consts {
         };
 
         struct MethodHandle {
-            SizeT refIdx;
-            RefKindT refKind;
+            SizeT refIdx{};
+            RefKindT refKind{};
 
             DEF_TAG_FLAG(CONSTANT_MethodHandle)
 
@@ -181,8 +181,8 @@ export namespace cp_consts {
         };
 
         struct NameAndType
-            : parser::common::SerCombinatorPMxn<NameAndType, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT nameIdx, descIdx;
+            : parser::common::SerCombinatorPMxn<NameAndType, SizeT, SizeT> {
+            SizeT nameIdx{}, descIdx{};
 
             DEF_TAG_FLAG(CONSTANT_NameAndType)
 
@@ -204,8 +204,8 @@ export namespace cp_consts {
             }
         };
 
-        struct MethodType : parser::common::SerCombinatorPMxn<MethodType, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT descIdx;
+        struct MethodType : parser::common::SerCombinatorPMxn<MethodType, SizeT> {
+            SizeT descIdx{};
 
             DEF_TAG_FLAG(CONSTANT_MethodType)
 
@@ -226,8 +226,8 @@ export namespace cp_consts {
         };
 
         template <opcodes::TagIdEnum tag>
-        struct Dynamic : parser::common::SerCombinatorPMxn<Dynamic<tag>, SizeT, SizeT> { // NOLINT(*-pro-type-member-init)
-            SizeT bootstrapMethodAttrIdx, nameAndTypeIdx;
+        struct Dynamic : parser::common::SerCombinatorPMxn<Dynamic<tag>, SizeT, SizeT> {
+            SizeT bootstrapMethodAttrIdx{}, nameAndTypeIdx{};
 
             TAG_FLAG(tag)
 
@@ -262,8 +262,9 @@ export namespace cp_consts {
             constexpr SourceUtf8() noexcept = default;
 
             template <typename SpecW>
-            void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
-                return span.deser(writePtr);
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept {
+                span.deser(writePtr);
+                return {};
             }
 
             NODISCARD std::string to_str() const noexcept {
@@ -326,78 +327,26 @@ export namespace cp_consts {
     } // namespace traits
 
     template <typename LambdaRetType>
-    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_2compl(const opcodes::TagIdEnum tagId,
-                                                                      auto&& callable) noexcept {
-        switch (tagId) {
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Float, Float);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Long, Long);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Double, Double);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Class, Class);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_String, String);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_MethodHandle, MethodHandle);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_MethodType, MethodType);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Dynamic, Dynamic);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Utf8, Utf8);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Fieldref, Fieldref);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Methodref, Methodref);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref, InterfaceMethodref);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_NameAndType, NameAndType);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_InvokeDynamic, InvokeDynamic);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Module, Module);
-            SWITCH_TAG_CASE_GEN_2COMPL(opcodes::TagIdEnum::CONSTANT_Package, Package);
-            [[unlikely]] default:
-                return std::nullopt;
-        }
-    }
-
-    template <typename LambdaRetType>
-    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_1compl_1rt(const opcodes::TagIdEnum tagId,
+    CPP_KOSTYL std::optional<LambdaRetType> trait_switch_tag_id_enum(const opcodes::TagIdEnum tagId,
                                                                           auto&& callable) noexcept {
         switch (tagId) {
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Integer, Integer);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Float, Float);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Long, Long);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Double, Double);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Class, Class);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_String, String);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_MethodHandle, MethodHandle);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_MethodType, MethodType);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Dynamic, Dynamic);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Utf8, Utf8);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Fieldref, Fieldref);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Methodref, Methodref);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref, InterfaceMethodref);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_NameAndType, NameAndType);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_InvokeDynamic, InvokeDynamic);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Module, Module);
-            SWITCH_TAG_CASE_GEN_1COMPL_1RT(opcodes::TagIdEnum::CONSTANT_Package, Package);
-            [[unlikely]] default:
-                return std::nullopt;
-        }
-    }
-
-    template <typename LambdaRetType>
-    CPP_KOSTYL std::optional<LambdaRetType> switch_tag_id_enum_1compl(const opcodes::TagIdEnum tagId,
-                                                                      auto&& callable) noexcept {
-        switch (tagId) {
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Integer);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Float);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Long);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Double);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Class);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_String);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_MethodHandle);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_MethodType);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Dynamic);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Utf8);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Fieldref);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Methodref);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_NameAndType);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_InvokeDynamic);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Module);
-            SWITCH_TAG_CASE_GEN_1COMPL(opcodes::TagIdEnum::CONSTANT_Package);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Integer, Integer); // NOLINT(*-branch-clone)
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Float, Float);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Long, Long);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Double, Double);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Class, Class);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_String, String);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_MethodHandle, MethodHandle);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_MethodType, MethodType);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Dynamic, Dynamic);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Utf8, Utf8);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Fieldref, Fieldref);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Methodref, Methodref);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_InterfaceMethodref, InterfaceMethodref);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_NameAndType, NameAndType);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_InvokeDynamic, InvokeDynamic);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Module, Module);
+            SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Package, Package);
             [[unlikely]] default:
                 return std::nullopt;
         }
@@ -456,7 +405,7 @@ export namespace cp_consts {
             }
 
             template <typename SpecW, bool unlikely = false>
-            NODISCARD gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) noexcept {
+            gstd::true_void deser(parser::WritePtrBySpec<SpecW>& writePtr) noexcept {
                 if constexpr (CPP_KOSTYL unlikely) {
                     if (is_holds_empty()) [[unlikely]] {
                         return {};
@@ -490,20 +439,20 @@ export namespace cp_consts {
 
         const auto handle_lambda = [&readPtr] {
             if constexpr (handle) {
-                return [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> traits::opt_cp_var {
+                return [&readPtr]<typename Trait>() noexcept -> traits::opt_cp_var {
                     if (auto value = Trait::parse(readPtr)) {
                         return {{*value}};
                     }
                     return {};
                 };
             } else {
-                return [&readPtr]<opcodes::TagIdEnum, typename Trait>() noexcept -> bool {
+                return [&readPtr]<typename Trait>() noexcept -> bool {
                     return Trait::check_and_move(readPtr);
                 };
             }
         }();
 
-        auto result = cp_consts::switch_tag_id_enum_2compl<std::conditional_t<handle, traits::opt_cp_var, bool>>(
+        auto result = cp_consts::trait_switch_tag_id_enum<std::conditional_t<handle, traits::opt_cp_var, bool>>(
                 tagId, handle_lambda);
 
         DEF_ASSERT_FALSE(result);

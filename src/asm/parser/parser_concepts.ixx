@@ -81,11 +81,11 @@ export namespace parser {
 
     template <typename T>
     concept JaacTranslator = requires(T t, u8_ptr pos, size_t iSize) {
-        { t.jaac_set_source_data_interval_first(pos) } -> std::same_as<void>;
-        { t.jaac_set_source_data_interval_last(pos) } -> std::same_as<void>;
+        { t.jaac_set_source_data_interval_begin(pos) } -> std::same_as<void>;
+        { t.jaac_set_source_data_interval_end(pos) } -> std::same_as<void>;
         { t.jaac_set_source_data_size(iSize) } -> std::same_as<void>;
-        { t.jaac_get_source_data_interval_first() } -> std::same_as<u8_ptr>;
-        { t.jaac_get_source_data_interval_last() } -> std::same_as<u8_ptr>;
+        { t.jaac_get_source_data_interval_begin() } -> std::same_as<u8_ptr>;
+        { t.jaac_get_source_data_interval_end() } -> std::same_as<u8_ptr>;
         { t.jaac_get_source_data_size() } -> std::same_as<size_t>;
     } && std::is_default_constructible_v<T>;
 

@@ -2,6 +2,7 @@ module;
 
 #include <cassert>
 #include <iostream>
+#include <optional>
 #include <span>
 #include "macro.h"
 
@@ -10,9 +11,9 @@ export module cached_2linked_list;
 import simple_cstd;
 
 export namespace c2l_list {
-    template <typename ElementType>
-    concept CanBeElement = requires(ElementType element) {
-        { ElementType::create_empty_in_linked2_cached_list() } -> std::convertible_to<ElementType>;
+    template <typename ElemT>
+    concept LinkedC2ListElement = requires(ElemT element) {
+        { ElemT::create_empty_in_linked2_cached_list() } -> std::convertible_to<ElemT>;
         { element.destruct_in_linked2_cached_list() } -> std::same_as<void>;
         { element.is_empty_in_linked2_cached_list() } -> std::convertible_to<bool>;
 #ifndef NDEBUG
@@ -70,8 +71,20 @@ export namespace c2l_list {
             friend BList;
             friend CList<ElementType>;
 
-            NODISCARD constexpr const NodeBase& get_data() const noexcept {
+            /*implicit*/ constexpr operator const NodeBase&() const & noexcept {
                 return *this;
+            }
+
+            /*implicit*/ constexpr operator const NodeBase&&() const && noexcept {
+                return std::move(*this);
+            }
+
+            /*implicit*/ constexpr operator const NodeBase&() & noexcept {
+                return *this;
+            }
+
+            /*implicit*/ constexpr operator const NodeBase&&() && noexcept {
+                return std::move(*this);
             }
 
             NODISCARD constexpr bool is_new() const noexcept {

@@ -56,13 +56,9 @@
     case instance: \
     return std::optional{callable.template operator()<instance, traits::trait>()};
 
-#define SWITCH_TAG_CASE_GEN_1COMPL_1RT(instance, trait)  \
+#define SWITCH_TAG_CASE_GEN(instance, trait)  \
     case instance: \
-    return std::optional{callable.template operator()<traits::trait>(instance)};
-
-#define SWITCH_TAG_CASE_GEN_1COMPL(instance)  \
-    case instance: \
-    return std::optional{callable.template operator()<instance>()};
+    return std::optional{callable.template operator()<traits::trait>()};
 
 #define SWITCH_TAG_CASE_GEN_TO_STR_V(instance)  \
     case opcodes::TagIdEnum::CONSTANT_##instance: \

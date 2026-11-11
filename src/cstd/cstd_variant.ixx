@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <iostream>
 #include <optional>
 #include <variant>
 #include "macro.h"
@@ -11,140 +10,51 @@ export module cstd_variant;
 import simple_cstd;
 import dstd;
 
-template <bool hasNullptr = false, typename... DerefTypes>
-using deref_to_ref_variant =
-        std::conditional_t<hasNullptr, std::variant<nullptr_t, DerefTypes*...>, std::variant<DerefTypes*...>>;
-
 export namespace cstd {
-    namespace mixins {
-        template <typename EmptyType, size_t emptyTypeIdx = 0>
-        struct emptiable_variant_mixin {
-            using EmptyT = EmptyType;
-            static constexpr size_t emptyIdx = emptyTypeIdx;
+    template <typename EmptyType, size_t emptyTypeIdx = 0>
+    struct emptiable_variant_p_mxn {
+        using EmptyT = EmptyType;
+        static constexpr size_t emptyIdx = emptyTypeIdx;
 
-            NODISCARD constexpr bool is_empty(this auto&& self) noexcept {
-                return self.index() == emptyTypeIdx;
-            }
-
-            NODISCARD constexpr bool is_not_empty(this auto&& self) noexcept {
-                return !self.is_empty();
-            }
-        };
-
-        template <typename DerefEmptyType, size_t emptyTypeIdx = 0>
-        struct emptiable_variant_of_ptrs_mixin : emptiable_variant_mixin<DerefEmptyType*, emptyTypeIdx> {
-            using DerefEmptyT = DerefEmptyType;
-        };
-
-        template <size_t nullTypeIdx = 0>
-        struct nullable_variant_of_ptrs_mixin {
-            static constexpr size_t nullIdx = nullTypeIdx;
-
-            NODISCARD constexpr bool is_null(this auto&& self) noexcept {
-                return self.index() == nullTypeIdx;
-            }
-
-            NODISCARD constexpr bool is_not_null(this auto&& self) noexcept {
-                return !self.is_null();
-            }
-        };
-
-        template <typename DerefEmptyType, size_t nullTypeIdx = 0, size_t emptyTypeIdx = 1>
-        struct emptiable_nullable_variant_of_ptrs_mixin : emptiable_variant_of_ptrs_mixin<DerefEmptyType, emptyTypeIdx>,
-                                                          nullable_variant_of_ptrs_mixin<nullTypeIdx> {
-            NODISCARD constexpr bool is_emptnull(this auto&& self) noexcept {
-                return self.is_null() || self.is_empty();
-            }
-
-            NODISCARD constexpr bool is_not_emptnull(this auto&& self) noexcept {
-                return !self.is_emptnull();
-            }
-        };
-    } // namespace mixins
-
-
-    template <bool hasNullptr = false, typename... DerefTypes>
-    struct variant_of_ptrs : deref_to_ref_variant<hasNullptr, DerefTypes...> {
-        using deref_to_ref_variant<hasNullptr, DerefTypes...>::deref_to_ref_variant;
-
-        NODISCARD constexpr void* get_raw_ptr() const noexcept {
-            return std::visit([](auto self) { return static_cast<void*>(self); }, *this);
+        NODISCARD constexpr bool is_empty(this auto&& self) noexcept {
+            return self.index() == emptyTypeIdx;
         }
 
-        constexpr void destruct_deref() const noexcept {
-            std::visit(overload{[](const auto* self) { delete self; }, [](const nullptr_t) {}}, *this);
-        }
-
-        constexpr auto deref_visit_with_nullptr(auto&& callable, auto&& null_callable) const noexcept {
-            return std::visit(
-                    overload{[&](auto* self) { return callable(*self); }, [&](nullptr_t) { return null_callable(); }},
-                    *this);
-        }
-
-        template <typename Callable>
-        constexpr auto deref_visit(Callable&& callable) const noexcept {
-            using Ret = dstd::call::MakeCallableTraits<Callable>::RetT;
-            return deref_visit_with_nullptr(std::forward<Callable>(callable), []() -> Ret {
-                assert(false);
-                // ReSharper disable once CppFunctionDoesntReturnValue
-            });
-        }
-
-        template <typename DerefType>
-        NODISCARD constexpr auto is_holds_alternative_ref() const noexcept {
-            return std::holds_alternative<DerefType*>(*this);
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const variant_of_ptrs& self) {
-            os << "vptr<" << self.index() << ">";
-            std::visit(overload{[&](auto* selfVal) {
-                                    os << "(";
-                                    selfVal->operatorKK(os);
-                                    os << ")";
-                                },
-                                [](nullptr_t) {}},
-                       self);
-            return os;
+        NODISCARD constexpr bool is_not_empty(this auto&& self) noexcept {
+            return !self.is_empty();
         }
     };
 
-    template <typename DerefEmptyType, typename... DerefTypes>
-    struct variant_of_emptiable_ptrs : variant_of_ptrs<false, DerefEmptyType, DerefTypes...>,
-                                       mixins::emptiable_variant_of_ptrs_mixin<DerefEmptyType> {
-        using variant_of_ptrs<true, DerefTypes...>::variant_of_ptrs;
+    enum class EmptyValueMode : uint8_t {
+        HAS,
+        HAS_IGNORE_VISIT,
+        HASNT
     };
-
-    template <typename... DerefTypes>
-    struct variant_of_nullable_ptrs : variant_of_ptrs<true, DerefTypes...>, mixins::nullable_variant_of_ptrs_mixin<> {
-        using variant_of_ptrs<true, DerefTypes...>::variant_of_ptrs;
-    };
-
-    template <typename DerefEmptyType, typename... DerefTypes>
-    struct variant_of_nullable_emptiable_ptrs : variant_of_nullable_ptrs<DerefEmptyType, DerefTypes...>,
-                                                mixins::emptiable_nullable_variant_of_ptrs_mixin<DerefEmptyType> {
-        using variant_of_nullable_ptrs<DerefEmptyType, DerefTypes...>::variant_of_nullable_ptrs;
-    };
-
-    enum class EmptyValueMode : uint8_t { HAS, HAS_IGNORE_VISIT, HASNT };
 
     namespace _internal {
         template <size_t, EmptyValueMode, typename...>
-        struct _0variant_of_ptrs_and_little {};
+        struct _0_variant_of_ptrs_and_little {};
     } // namespace _internal
 
     template <size_t little = ptr_size, EmptyValueMode emptyValueMode = EmptyValueMode::HASNT, typename... DerefTypes>
     struct variant_of_ptrs_and_little
         : std::variant<OptPtrTBy<DerefTypes, little>...>,
-          std::conditional_t<emptyValueMode != EmptyValueMode::HASNT, mixins::emptiable_variant_mixin<DerefTypes...[0]>,
-                             _internal::_0variant_of_ptrs_and_little<little, emptyValueMode, DerefTypes...>> {
+          std::conditional_t<emptyValueMode != EmptyValueMode::HASNT, emptiable_variant_p_mxn<DerefTypes...[0]>,
+                             _internal::_0_variant_of_ptrs_and_little<little, emptyValueMode, DerefTypes...>> {
         using varT = std::variant<OptPtrTBy<DerefTypes, little>...>;
 
         template <typename DerefType>
-        using GetOptType = OptPtrTBy<DerefType, little>;
+        using GetOptimType = OptPtrTBy<DerefType, little>;
 
     private:
-        using EmptyType = GetOptType<DerefTypes...[0]>;
-        using AnyFullType = GetOptType<DerefTypes...[1]>;
+        using EmptyType = GetOptimType<DerefTypes...[0]>;
+        using AnyFullType = decltype([] {
+            if constexpr (sizeof...(DerefTypes) > 1) {
+                return dstd::args::TypeWrapper<GetOptimType<DerefTypes...[1]>>{};
+            } else {
+                return dstd::args::TypeWrapper<void>{};
+            }
+        }())::InstanceT;
 
     public:
         NODISCARD F_INLINE static auto add_emp_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
@@ -164,19 +74,28 @@ export namespace cstd {
         }
 
         template <typename Callable>
+            requires(emptyValueMode != EmptyValueMode::HAS_IGNORE_VISIT || !std::same_as<AnyFullType, void>)
         NODISCARD F_INLINE static auto emp_ignore_in_visit_lambda(Callable&& callable) noexcept {
-            using RetT = decltype(std::forward<Callable>(callable)(std::declval<AnyFullType>()));
-            return add_emp_ignore_to_visit_lambda(std::forward<Callable>(callable),
-                                                  [](EmptyType) -> RetT { std::unreachable(); });
+            if constexpr (emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
+                using RetT = decltype(std::forward<Callable>(callable)(std::declval<AnyFullType>()));
+                return overload{std::forward<Callable>(callable), [](EmptyType) -> RetT { std::unreachable(); }};
+            } else {
+                return callable;
+            }
         }
 
-        constexpr void destruct_deref() const noexcept {
-            std::visit(overload{[](const auto* self) { delete self; }, [](const auto) {}}, *this);
+        constexpr void destruct_deref() noexcept {
+            std::visit(overload{[](auto*& self) {
+                                    delete self;
+                                    self = nullptr;
+                                },
+                                [](auto&&) {}},
+                       *this);
         }
 
         template <typename DerefType>
         NODISCARD constexpr auto is_holds_alternative() const noexcept {
-            return std::holds_alternative<GetOptType<DerefType>>(*this);
+            return std::holds_alternative<GetOptimType<DerefType>>(*this);
         }
 
         NODISCARD constexpr auto is_holds_empty() const noexcept {
@@ -184,21 +103,11 @@ export namespace cstd {
         }
 
         template <typename Callable>
-        constexpr auto deref_visit(Callable&& callable) const noexcept {
-            return std::visit(emp_ignore_in_visit_lambda(
-                    overload{[&]<typename T>(T self)
-                                 requires std::is_pointer_v<T>
-                             { return std::forward<Callable>(callable)(*self); },
-                             [&](const auto self) { return std::forward<Callable>(callable)(self); }}),
-                    *this);
-        }
-
-        template <typename BigC, typename SmallC>
-        constexpr auto sep_visit(BigC&& bigC, BigC&& smallC) const noexcept {
-            return std::visit(emp_ignore_in_visit_lambda(overload{
-                                      [&bigC](const auto* self) { return std::forward<BigC>(bigC)(self); },
-                                      [&smallC](const auto self) { return std::forward<SmallC>(smallC)(self); }}),
-                              *this);
+        constexpr auto deref_visit(this auto&& slf, Callable&& callable) noexcept {
+            return std::visit(slf.emp_ignore_in_visit_lambda(overload{
+                                      [&]<typename T>(T* self) { return std::forward<Callable>(callable)(*self); },
+                                      [&](auto&& self) { return std::forward<Callable>(callable)(self); }}),
+                              slf);
         }
 
         friend std::ostream& operator<<(std::ostream& os, const variant_of_ptrs_and_little self) {

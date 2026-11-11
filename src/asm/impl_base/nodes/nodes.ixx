@@ -19,7 +19,7 @@ export namespace nodes {
     namespace templ {
         struct ParseFlags { // NOLINT(*-pro-type-member-init)
             bool useWrite;
-            bool handleVersion, handleAccess, deepHandleThisClassIdx, handleSuperClassIdx = false;
+            bool writeVersion, writeAccess, writeThisClassIdx, writeSuperClassIdx = false;
             bool parseCpoolStructure = false;
             parser::HandleMode handleModeCpool, handleModeIfaces, handleModeFields, handleModeMethods, handleModeAttrs = parser::HandleMode::NONE;
             parser::ParseLength parseLength = parser::ParseLength::FULL;
@@ -28,10 +28,10 @@ export namespace nodes {
         template <ParseFlags parseFlags>
         struct ClearClassN {
             PUBLIC_V_GENERIC_R_AT(parseFlags, useWrite)
-            PUBLIC_V_GENERIC_R_AT(parseFlags, handleVersion)
-            PUBLIC_V_GENERIC_R_AT(parseFlags, handleAccess)
-            PUBLIC_V_GENERIC_R_AT(parseFlags, deepHandleThisClassIdx)
-            PUBLIC_V_GENERIC_R_AT(parseFlags, handleSuperClassIdx)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, writeVersion)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, writeAccess)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, writeThisClassIdx)
+            PUBLIC_V_GENERIC_R_AT(parseFlags, writeSuperClassIdx)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeCpool)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeIfaces)
             PUBLIC_V_GENERIC_R_AT(parseFlags, handleModeFields)
@@ -64,7 +64,7 @@ export namespace nodes {
                 /*implicit*/ constexpr CpoolAndRawVar(RawAnyJaacSpan<> span) noexcept : Base(span) {}
 
                 template <typename SpecW>
-                NODISCARD gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
+                gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
                     std::visit([&writePtr](auto self) {
                         self.deser(writePtr);
                     }, *this);

@@ -41,7 +41,7 @@
 
 #define OPT_ARRAY_HANDLE_INIT(name, uName, path, sizeT) \
         DEF_OR_ELSE_OPT_UNEX(sizeT, name##_size); \
-        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_first(readPtr.i); classNode.path.jaac_set_source_data_size(name##_size); }\
+        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_begin(readPtr.i); classNode.path.jaac_set_source_data_size(name##_size); }\
 
 #define DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path) OPT_ARRAY_HANDLE_INIT(name, uName, path, wrappers::ArraySizeT)
 
@@ -56,11 +56,12 @@
         if constexpr (handleMode##uName##Flag != HandleMode::NONE && requires { classNode.path.jaac_postcomplete_handle(classNode); }) { \
             classNode.path.jaac_postcomplete_handle(classNode); \
         } \
-        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_last(readPtr.i - 1); }
+        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_end(readPtr.i); }
 
-#define DEF_DESER(uName, path, iterCowr, hasParseSizeAndSkip0, ...) deser_array<iterCowr, handleMode##uName##Flag, hasParseSizeAndSkip0, SpecR, SpecW>(writePtr, classNode.path, __VA_ARGS__)
-#define DEF_JAAC_PRIM_DESER(uName, path, argT) DEF_DESER(uName, path, cstd::ImplConvertableCowr<argT>, false, [&writePtr] (argT value) { value.deser(writePtr); })
-#define DEF_JAAC_COMPLEX_DESER(uName, path) DEF_DESER(uName, path, JaacDeserableCowr<SpecW>, false, [&writePtr] (auto& value) { value.deser(writePtr); })
+#define DEF_DESER(uName, path, iterCowr, hasParseSizeAndSkip0, sizeT, ...) deser_array<iterCowr, handleMode##uName##Flag, sizeT, hasParseSizeAndSkip0, SpecR, SpecW>(writePtr, classNode.path, __VA_ARGS__)
+#define DEF_JAAC_PRIM_DESER(uName, path, argT, sizeT) DEF_DESER(uName, path, cstd::ImplConvertableCowr<argT>, false, sizeT, [&writePtr] (argT value) { value.deser(writePtr); })
+#define DEF_JAAC_COMPLEX_DESER(uName, path, sizeT) DEF_DESER(uName, path, JaacDeserableCowr<SpecW>, false, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
+#define DEF_JAAC_COMPLEX_DESER_SKIP0(uName, path, sizeT) DEF_DESER(uName, path, JaacDeserableCowr<SpecW>, true, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
 
 #define DEF_OPT_ARRAY_HANDLE(name, uName, path, ...) \
         DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path) \
@@ -71,45 +72,44 @@
                 classNode.path.jaac_prewrite_handle(classNode); \
             }
 
-#define SIMPLE_FIELD_HANDLE_INNER(name, path, Type, oldInst, timed_pre1) \
-     using timed_t_0 = decltype(classNode.path); \
-     COM_BOOL timed_b_1 = std::same_as<timed_t_0, Type>; \
-     COM_BOOL timed_b_2 = requires { classNode.path = timed_t_0::jaac_convert_from_##name(oldInst); }; \
-     COM_BOOL timed_s = timed_pre1 || timed_b_1 || timed_b_2; \
-     if constexpr (timed_b_1) { \
-         classNode.path = oldInst; \
-     } else if constexpr (timed_b_2) { \
-         classNode.path = timed_t_0::jaac_convert_from_##name(oldInst); \
-     } else { \
-         static_assert(timed_s, "Invalid type of field "#path". Flat expected "#Type); \
-     }
+#define FIELD_WRITER_INNER(name, path, Type, oldInst, timed_pre1) \
+    using timed_t_1 = decltype(classNode.path); \
+    COM_BOOL timed_b_1 = cstd::is_implicit_convertable<Type, timed_t_1>; \
+    COM_BOOL timed_b_2 = requires { { timed_t_1::jaac_convert_from_##name(oldInst) } -> std::same_as<timed_t_1>; }; \
+    COM_BOOL timed_s = !timed_pre1 || timed_b_1 || timed_b_2; \
+    if constexpr (timed_b_1) { \
+        classNode.path = oldInst; \
+    } else if constexpr (timed_b_2) { \
+        classNode.path = timed_t_1::jaac_convert_from_##name(oldInst); \
+    } else { \
+        static_assert(timed_s, "Invalid type of field "#path". Flat expected "#Type); \
+    }
 
-#define FIELD_HANDLE_INNER(name, path, Type, oldInst, timed_pre1) \
-    SIMPLE_FIELD_HANDLE_INNER(name, path, Type, oldInst, timed_pre1); \
-    static_assert(!timed_b_2 || requires { oldInst = classNode.path.jaac_convert_to_##name(); }, "Invalid type of field "#path" (not convertable to "#name")"); \
+#define FIELD_RETURNER_INNER(name, path, Type, oldInst, timed_pre1) \
+    using timed_t_1 = decltype(classNode.path); \
+    COM_BOOL timed_b_1 = cstd::is_implicit_convertable<timed_t_1, Type>; \
+    COM_BOOL timed_b_2 = requires { { classNode.path.jaac_convert_to_##name() } -> std::same_as<Type>; }; \
+    COM_BOOL timed_s = !timed_pre1 || timed_b_1 || timed_b_2; \
     if constexpr (timed_b_1) { \
         return [&] () mutable -> void { oldInst = classNode.path; }; \
     } else if constexpr (timed_b_2) { \
         return [&] () mutable -> void { oldInst = classNode.path.jaac_convert_to_##name(); }; \
     } else { \
+        static_assert(timed_s, "Invalid type of field "#path". Flat expected "#Type); \
         return false; \
     }
 
-#define SIMPLE_HANDLE(name, path, Type, oldInst) [&] { \
-    COM_BOOL timed_pre1 = CHECK_FIELD_EXISTS(classNode, source_##name); \
+#define FIELD_HANDLE_OUTER(path, ...) [&] { \
+    COM_BOOL timed_pre1 = CHECK_FIELD_EXISTS(classNode, path); \
     if constexpr (timed_pre1) { \
-        SIMPLE_FIELD_HANDLE_INNER(source_##name, path, Type, oldInst, timed_pre1); \
+        __VA_ARGS__; \
     } else { \
         return false; \
     } } ()
 
-#define HANDLE(name, path, Type, oldInst) [&] { \
-    COM_BOOL timed_pre1 = CHECK_FIELD_EXISTS(classNode, source_##name); \
-    if constexpr (timed_pre1) { \
-        FIELD_HANDLE_INNER(source_##name, path, Type, oldInst, timed_pre1); \
-    } else { \
-        return false; \
-    } } ()\
+#define FIELD_WRITER(name, path, Type, oldInst) FIELD_HANDLE_OUTER(path, FIELD_WRITER_INNER(name, path, Type, oldInst, timed_pre1))
+
+#define FIELD_RETURNER(name, path, Type, oldInst) FIELD_HANDLE_OUTER(path, FIELD_RETURNER_INNER(name, path, Type, oldInst, timed_pre1))
 
 #define DEF_CHECK_METHOD_EXISTS(name) CHECK_METHOD_EXISTS(classNode, name)
 #define DEF_CHECK_FIELD_EXISTS(name) CHECK_FIELD_EXISTS(classNode, name)
@@ -119,12 +119,12 @@
 #define DEF_ASSERT_FALSE(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return false; }
 
 #define DEF_OR_ELSE_OPT_UNEX(type, name) OR_ELSE_OPT_UNEX(type, name, type::parse(readPtr), ParseErr::INVALID)
+#define DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name) { auto timed = type::parse(readPtr); if (!timed) [[unlikely]] { return std::unexpected{ParseErr::INVALID}; }; name = *timed; }
 #define DEF_OR_ELSE_OPT_INVALID(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return ParseErr::INVALID;)
 #define DEF_OR_ELSE_RET_FALSE(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return false;)
 #define DEF_CHECK_MEMORY_OR_UNEX(bytes) { bool val = readPtr.check_and_move(bytes); assert(val); if (!val) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
 
-#define DEF_I_HANDLE(type, name) SIMPLE_HANDLE(name, name, type, name)
-#define DEF_GET_AND_I_HAND(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_I_HANDLE(type, name);
-#define DEF_HANDLE(type, name) HANDLE(name, name, type, name)
-
-#define DEF_FULL_HANDLE(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_HANDLE(type, name); if constexpr (useWriteFlag) {defBackAddingLambda1(name)}
+#define DEF_FIELD_WRITER(type, name) FIELD_WRITER(name, name, type, name)
+#define DEF_EXISTS_GET_AND_FIELD_WRITE(type, name) DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(type, name);
+#define DEF_GET_AND_FIELD_WRITE(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(type, name);
+#define DEF_FIELD_RETURNER(type, name) FIELD_RETURNER(name, name, type, name)

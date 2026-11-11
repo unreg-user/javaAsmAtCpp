@@ -1,7 +1,6 @@
 module;
 
 #include <optional>
-#include <span>
 
 #include "../../../cstd/macro.h"
 
@@ -13,40 +12,6 @@ import simple_cstd;
 import gstd;
 
 export namespace parser::common {
-    struct Translator {
-    protected:
-        u8_ptr source_first = nullptr;
-        u8_ptr source_last = nullptr;
-        size_t source_size = 0;
-
-    public:
-        constexpr Translator() noexcept = default;
-
-        constexpr void jaac_set_source_data_interval_first(u8_ptr pos) noexcept {
-            source_first = pos;
-        }
-
-        constexpr void jaac_set_source_data_interval_last(u8_ptr pos) noexcept {
-            source_last = pos;
-        }
-
-        constexpr void jaac_set_source_data_size(const size_t iSize) noexcept {
-            source_size = iSize;
-        }
-
-        NODISCARD constexpr decltype(auto) jaac_get_source_data_interval_first(this auto&& self) noexcept {
-            return self.source_first;
-        }
-
-        NODISCARD constexpr decltype(auto) jaac_get_source_data_interval_last(this auto&& self) noexcept {
-            return self.source_last;
-        }
-
-        NODISCARD constexpr decltype(auto) jaac_get_source_data_size(this auto&& self) noexcept {
-            return self.source_size;
-        }
-    };
-
     struct JaacIterablePMxn {
         decltype(auto) jaac_begin(this auto&& self) {
             return self.begin();
@@ -82,14 +47,58 @@ export namespace parser::common {
     };
 
     struct HasParseSizePMxn {
-        size_t parse_size = 0;
+        size_t parseSize = 0;
 
         NODISCARD size_t jaac_get_parse_size() const noexcept {
-            return parse_size;
+            return parseSize;
         }
 
         void jaac_set_parse_size(const size_t size) noexcept {
-            parse_size = size;
+            parseSize = size;
         }
+    };
+
+    struct Translator {
+    protected:
+        u8_ptr sourceBegin = nullptr;
+        u8_ptr sourceEnd = nullptr;
+        size_t sourceSize = 0;
+
+    public:
+        constexpr Translator() noexcept = default;
+
+        constexpr void jaac_set_source_data_interval_begin(uint8_t* pos) noexcept {
+            sourceBegin = pos;
+        }
+
+        constexpr void jaac_set_source_data_interval_end(uint8_t* pos) noexcept {
+            sourceEnd = pos;
+        }
+
+        constexpr void jaac_set_source_data_size(const size_t iSize) noexcept {
+            sourceSize = iSize;
+        }
+
+        NODISCARD constexpr decltype(auto) jaac_get_source_data_interval_begin(this auto&& self) noexcept {
+            return self.sourceBegin;
+        }
+
+        NODISCARD constexpr decltype(auto) jaac_get_source_data_interval_end(this auto&& self) noexcept {
+            return self.sourceEnd;
+        }
+
+        NODISCARD constexpr decltype(auto) jaac_get_source_data_size(this auto&& self) noexcept {
+            return self.sourceSize;
+        }
+    };
+
+    template <typename Base, typename ClassNT>
+    CPP_KOSTYL struct ClassNodeKnowsWMxn : Base {
+        ClassNT& classNode;
+
+        template <typename... Args> requires (sizeof...(Args) > 0)
+        /*implicit*/ constexpr ClassNodeKnowsWMxn(ClassNT& classNode, Args&&... args) noexcept : Base(args...), classNode(classNode) {}
+
+        explicit constexpr ClassNodeKnowsWMxn(ClassNT& classNode) noexcept : Base(), classNode(classNode) {}
     };
 } // namespace parser::common

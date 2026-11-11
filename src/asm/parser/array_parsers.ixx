@@ -20,7 +20,7 @@ export namespace parser {
     struct JaacIterator {
         T& obj;
 
-        decltype(auto) begin() noexcept {
+        auto begin() noexcept {
             if constexpr (skip0) {
                 return ++obj.jaac_begin();
             } else {
@@ -28,7 +28,7 @@ export namespace parser {
             }
         }
 
-        decltype(auto) end() noexcept {
+        auto end() noexcept {
             return obj.jaac_end();
         }
     };
@@ -36,13 +36,13 @@ export namespace parser {
     template <bool hasParseSize>
     size_t get_array_deser_size(auto&& jaacArray) noexcept {
         if constexpr (hasParseSize) {
-            return jaacArray.jaac_get_size();
-        } else {
             return jaacArray.jaac_get_parse_size();
+        } else {
+            return jaacArray.jaac_size();
         }
     }
 
-    template <typename OutCowr, HandleMode handleMode, bool hasParseSize = false, typename SpecR, typename SpecW,
+    template <typename OutCowr, HandleMode handleMode, typename ArrayRSizeT = wrappers::ArraySizeT, bool hasParseSize = false, typename SpecR, typename SpecW,
               bool skip0 = hasParseSize, typename ArrDirT>
     void deser_array(WritePtrBySpec<SpecW>& writePtr, ArrDirT&& jaacArray, auto&& deserializer1) noexcept {
         using ArrT = std::remove_cvref_t<ArrDirT>;
@@ -60,16 +60,17 @@ export namespace parser {
             static_assert(handleMode == HandleMode::FULL || JaacTranslator<ArrT>);
 
             if constexpr (handleMode == HandleMode::FULL) {
-                writePtr.deser_rev(get_array_deser_size<hasParseSize>(jaacArray));
+                ArrayRSizeT{get_array_deser_size<hasParseSize>(jaacArray)}.deser(writePtr);
             } else if constexpr (handleMode == HandleMode::APPEND) {
-                writePtr.deser_rev(jaacArray.jaac_get_source_data_size() +
-                                   get_array_deser_size<hasParseSize>(jaacArray));
+                ArrayRSizeT{
+                    jaacArray.jaac_get_source_data_size() +
+                            get_array_deser_size<hasParseSize>(jaacArray)
+                }.deser(writePtr);
             } else {
-                writePtr.deser_rev(jaacArray.jaac_get_source_data_size());
+                ArrayRSizeT{jaacArray.jaac_get_source_data_size()}.deser(writePtr);
             }
             if constexpr (handleMode != HandleMode::FULL) {
-                writePtr.deser_range(ReadPtrBySpec<SpecR>{jaacArray.jaac_get_source_data_first(),
-                                                          jaacArray.jaac_get_source_data_last()});
+                writePtr.deser_range(UncheckedReadPtr{jaacArray.jaac_get_source_data_interval_begin(), jaacArray.jaac_get_source_data_interval_end()});
             }
 
             if constexpr (handleMode != HandleMode::NONE) {
@@ -85,12 +86,12 @@ export namespace parser {
         auto readPtr2 = readPtr;
         if (!readPtr.template check_memory_and_move<CpoolRSizeT>()) [[unlikely]]
             return {nullptr, nullptr}; // name_idx
-        auto length = readPtr.template memcpy_get_rev<AttrsRSizeT>();
+        auto length = readPtr.template memcpy_get_rev<AttrsInnerRSizeT>();
         if (!length) [[unlikely]]
             return {nullptr, nullptr};
         if (!readPtr.check_memory_and_move(length)) [[unlikely]]
             return {nullptr, nullptr};
-        readPtr2.endPtr = readPtr.i - 1;
+        readPtr2.endPtr = readPtr.i;
         return readPtr2;
     }
 

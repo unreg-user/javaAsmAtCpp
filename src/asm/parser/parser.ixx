@@ -4,7 +4,6 @@ module;
 #include <concepts>
 #include <cstdint>
 #include <expected>
-#include <iostream>
 #include <optional>
 #include <span>
 #include <type_traits>
@@ -66,11 +65,7 @@ export namespace parser {
             DEF_ASSERT_UNEX(readPtr.template check_and_move<4>());
         }
 
-        DEF_OR_ELSE_OPT_UNEX(wrappers::VersionNumber, version);
-
-        DEF_BOOL_CNT_FLAG_GEN(handleVersion);
-        // deep analys of version, lol
-        auto versionH = cstd::or_else_falseCPY<handleVersionFlag>(DEF_HANDLE(wrappers::VersionNumber, version));
+        DEF_GET_AND_FIELD_WRITE(wrappers::VersionNumber, version);
 
         DEF_BOOL_CNT_FLAG_GEN(parseCpoolStructure);
         using CpoolArrInputT = std::conditional_t<parseCpoolStructureFlag, cp_consts::traits::cp_var, u8_span>;
@@ -81,23 +76,9 @@ export namespace parser {
         DEF_COM_ARRAY_HANDLE(Methods, methods, common::MFInfo<>);
         DEF_COM_ARRAY_HANDLE(Attrs, attrs, common::DefVeryFullAttribute);
 
-        wrappers::AccessFlags access_flags;
-        wrappers::CpoolSizeT this_class;
-        wrappers::CpoolSizeT super_class;
-
-        DEF_BOOL_CNT_FLAG_GEN(handleAccess);
-        DEF_BOOL_CNT_FLAG_GEN(deepHandleThisClassIdx);
-        DEF_BOOL_CNT_FLAG_GEN(handleSuperClassIdx);
-
-        auto postCPoolSimpleHRetsLambda = [&] {
-            return cstd::func_or_false_line(
-                    cstd::or_else_falseCPY<handleAccessFlag>(DEF_HANDLE(RawAccessFlagsT, access_flags)),
-                    cstd::or_else_falseCPY<deepHandleThisClassIdxFlag>(DEF_HANDLE(CpoolRSizeT, this_class)),
-                    cstd::or_else_falseCPY<handleSuperClassIdxFlag>(DEF_HANDLE(CpoolRSizeT, super_class)));
-        };
-
-        std::conditional_t<parseLengthFlag >= ParseLength::CPOOL, decltype((postCPoolSimpleHRetsLambda())), bool>
-                postCPoolSimpleH;
+        wrappers::AccessFlags accessFlags;
+        wrappers::CpoolSizeT thisClass;
+        wrappers::CpoolSizeT superClass;
 
         if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
             DEF_OPT_ARRAY_HANDLE(cpool, Cpool, cpool, {
@@ -148,30 +129,9 @@ export namespace parser {
                 }
             });
 
-            {
-                auto timed = wrappers::AccessFlags::parse(readPtr);
-                if (!timed) [[unlikely]] {
-                    return std::unexpected{ParseErr::INVALID};
-                }
-                access_flags = *timed;
-            }
-            {
-                auto timed = wrappers::CpoolSizeT::parse(readPtr);
-                if (!timed) [[unlikely]] {
-                    return std::unexpected{ParseErr::INVALID};
-                }
-                this_class = *timed;
-            }
-            DEF_I_HANDLE(wrappers::CpoolSizeT, this_class);
-            {
-                auto timed = wrappers::CpoolSizeT::parse(readPtr);
-                if (!timed) [[unlikely]] {
-                    return std::unexpected{ParseErr::INVALID};
-                }
-                super_class = *timed;
-            }
-
-            postCPoolSimpleH = postCPoolSimpleHRetsLambda();
+            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::AccessFlags, accessFlags);
+            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::CpoolSizeT, thisClass);
+            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::CpoolSizeT, superClass);
 
             if constexpr (parseLengthFlag >= ParseLength::IFACES) {
                 DEF_OPT_ARRAY_HANDLE(ifaces, Ifaces, ifaces, {
@@ -186,20 +146,23 @@ export namespace parser {
                 });
 
                 if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
-                    DEF_OPT_ARRAY_HANDLE(fields, Fields, fields,
-                                         { DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size)); });
+                    DEF_OPT_ARRAY_HANDLE(fields, Fields, fields, {
+                        DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size));
+                    });
 
 
                     if constexpr (parseLengthFlag >= ParseLength::METHODS) {
                         DEF_OPT_ARRAY_HANDLE(methods, Methods, methods, {
-                            DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size));
+                            DEF_ASSERT_UNEX(
+                                    parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size));
                         });
 
 
                         if constexpr (parseLengthFlag >= ParseLength::FULL) {
                             DEF_OPT_ARRAY_HANDLE(attrs, Attrs, attrs, {
-                                DEF_ASSERT_UNEX(parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
-                                        readPtr, classNode.attrs, attrs_size));
+                                DEF_ASSERT_UNEX(
+                                        parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
+                                                readPtr, classNode.attrs, attrs_size));
                             });
                         }
                     }
@@ -219,17 +182,19 @@ export namespace parser {
         };
 
         if constexpr (useWriteFlag) {
-            // open file
-            const auto wDataOpt = preRWData.open("wb");
-            if (!wDataOpt)
-                return retValLambda(DeserErr::UNOPEN);
-            auto wData = *wDataOpt;
-
-            // call handlers
-            versionH();
+            // call handlers (deep analys of version, lol)
+            DEF_BOOL_CNT_FLAG_GEN(writeVersion);
+            cstd::call_if_no_false(
+                    cstd::or_else_falseCPY<writeVersionFlag>(DEF_FIELD_RETURNER(wrappers::VersionNumber, version)));
             if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
+                DEF_BOOL_CNT_FLAG_GEN(writeAccess);
+                DEF_BOOL_CNT_FLAG_GEN(writeThisClassIdx);
+                DEF_BOOL_CNT_FLAG_GEN(writeSuperClassIdx);
+                cstd::call_if_no_false(cstd::func_or_false_line(
+                        cstd::or_else_falseCPY<writeAccessFlag>(DEF_FIELD_RETURNER(RawAccessFlagsT, accessFlags)),
+                        cstd::or_else_falseCPY<writeThisClassIdxFlag>(DEF_FIELD_RETURNER(CpoolRSizeT, thisClass)),
+                        cstd::or_else_falseCPY<writeSuperClassIdxFlag>(DEF_FIELD_RETURNER(CpoolRSizeT, superClass))));
                 DEF_ARRAY_PREWRITE_CALL(Cpool, cpool)
-                postCPoolSimpleH();
                 if constexpr (parseLengthFlag >= ParseLength::IFACES) {
                     DEF_ARRAY_PREWRITE_CALL(Ifaces, ifaces)
                     if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
@@ -244,6 +209,12 @@ export namespace parser {
                 }
             }
 
+            // open file
+            const auto wDataOpt = preRWData.open("wb");
+            if (!wDataOpt)
+                return retValLambda(DeserErr::UNOPEN);
+            auto wData = *wDataOpt;
+
             // deser
             std::vector<uint8_t> outData;
             outData.reserve(readData.size);
@@ -251,24 +222,33 @@ export namespace parser {
 
             outData.append_range(opcodes::magic_array_rev);
             version.deser(writePtr);
-
             if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
-                DEF_JAAC_COMPLEX_DESER(Cpool, cpool);
+                DEF_JAAC_COMPLEX_DESER_SKIP0(Cpool, cpool, wrappers::CpoolSizeT);
 
-                access_flags.deser(writePtr);
-                this_class.deser(writePtr);
-                super_class.deser(writePtr);
+                accessFlags.deser(writePtr);
+                thisClass.deser(writePtr);
+                superClass.deser(writePtr);
 
-                DEF_JAAC_PRIM_DESER(Ifaces, ifaces, wrappers::CpoolSizeT);
-                DEF_JAAC_COMPLEX_DESER(Fields, fields);
-                DEF_JAAC_COMPLEX_DESER(Methods, methods);
-                DEF_JAAC_COMPLEX_DESER(Attrs, attrs);
+                if constexpr (parseLengthFlag >= ParseLength::IFACES) {
+                    DEF_JAAC_PRIM_DESER(Ifaces, ifaces, wrappers::CpoolSizeT, wrappers::Number<ArrayRSizeT>);
+                    if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                        DEF_JAAC_COMPLEX_DESER(Fields, fields, wrappers::ArraySizeT);
+                        if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                            DEF_JAAC_COMPLEX_DESER(Methods, methods, wrappers::ArraySizeT);
+                            if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                                DEF_JAAC_COMPLEX_DESER(Attrs, attrs, wrappers::ArraySizeT);
+                            }
+                        }
+                    }
+                }
             }
 
-            outData.append_range(readPtr);
+            if constexpr (parseLengthFlag < ParseLength::FULL) {
+                outData.append_range(readPtr);
+            }
 
             // close file
-            wData.raw_write_file(reader::convertToFileDataWS(std::move(outData)));
+            wData.raw_write_file(reader::convertToFileDataWS(outData));
             wData.close();
         }
 

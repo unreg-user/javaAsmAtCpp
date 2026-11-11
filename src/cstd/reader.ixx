@@ -321,7 +321,7 @@ export namespace reader {
     };
 
     template <typename Sym>
-    FileDataWithSize<Sym> convertToFileDataWS(std::vector<Sym>&& vec) noexcept {
+    FileDataWithSize<Sym> convertToFileDataWS(std::vector<Sym>& vec) noexcept {
         return FileDataWithSize<Sym>{vec.data(), vec.size()};
     }
 } // namespace reader
