@@ -22,7 +22,6 @@ import cp_consts;
 import parser_utils;
 import parser_concepts;
 import array_parsers;
-import ptr_function;
 import dstd;
 import parser_b1;
 import parser_b2;
@@ -45,16 +44,21 @@ export namespace parser {
     using ParseRetType = std::expected<CondPairInParseRetType<JaacClassNTRetConverted<ClassNT>>, ParseErr>;
 
     template <typename ClassNT /*CNT*/, typename SpecR = cflags::class_file_ptr,
-              typename SpecW = cflags::class_file_ptr, bool checkMagic = true, bool g1>
-        requires JaacClassNT<ClassNT>
-    ParseRetType<ClassNT> parse1(const reader::PreRWFileData<g1> preRWData,
-                                 const reader::FileDataWithSize<> readData) noexcept {
+              typename SpecW = cflags::class_file_ptr, bool checkMagic = true>
+    ParseRetType<ClassNT> parse1(const reader::FileDataWithSize<> readData) noexcept {
+        static_assert(JaacClassNT<ClassNT>);
+
         using ReadPtr = ReadPtrBySpec<SpecR>;
         using WritePtr = WritePtrBySpec<SpecW>;
 
         ClassNT classNode{};
         DEF_BOOL_CNT_FLAG_GEN(useWrite);
         DEF_CNT_FLAG_GEN(parseLength, ParseLength);
+        LENGTH_BOOL_GEN(CPOOL);
+        LENGTH_BOOL_GEN(IFACES);
+        LENGTH_BOOL_GEN(FIELDS);
+        LENGTH_BOOL_GEN(METHODS);
+        LENGTH_BOOL_GEN(FULL);
 
         ReadPtr readPtr{readData};
 
@@ -65,26 +69,27 @@ export namespace parser {
             DEF_ASSERT_UNEX(readPtr.template check_and_move<4>());
         }
 
-        DEF_GET_AND_FIELD_WRITE(wrappers::VersionNumber, version);
+        DEF_GET_AND_FIELD_WRITE(true, wrappers::VersionNumber, version);
+
 
         DEF_BOOL_CNT_FLAG_GEN(parseCpoolStructure);
         using CpoolArrInputT = std::conditional_t<parseCpoolStructureFlag, cp_consts::traits::cp_var, u8_span>;
 
-        DEF_COM_ARRAY_HANDLE(Cpool, cpool, CpoolArrInputT);
-        DEF_COM_ARRAY_HANDLE(Ifaces, ifaces, wrappers::CpoolSizeT);
-        DEF_COM_ARRAY_HANDLE(Fields, fields, common::MFInfo<>);
-        DEF_COM_ARRAY_HANDLE(Methods, methods, common::MFInfo<>);
-        DEF_COM_ARRAY_HANDLE(Attrs, attrs, common::DefVeryFullAttribute);
+        DEF_COM_ARRAY_HANDLE(containsCPOOL_Parsing, Cpool, cpool, CpoolArrInputT);
+        DEF_COM_ARRAY_HANDLE(containsIFACES_Parsing, Ifaces, ifaces, wrappers::CpoolSizeT);
+        DEF_COM_ARRAY_HANDLE(containsFIELDS_Parsing, Fields, fields, common::MFInfo<>);
+        DEF_COM_ARRAY_HANDLE(containsMETHODS_Parsing, Methods, methods, common::MFInfo<>);
+        DEF_COM_ARRAY_HANDLE(containsFULL_Parsing, Attrs, attrs, common::DefVeryFullAttribute);
+
 
         wrappers::AccessFlags accessFlags;
         wrappers::CpoolSizeT thisClass;
         wrappers::CpoolSizeT superClass;
 
-        if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
+        if constexpr (containsCPOOL_Parsing) {
             DEF_OPT_ARRAY_HANDLE(cpool, Cpool, cpool, {
                 static_assert(!hasCorrectCpool || WithParseSize<decltype(classNode.cpool)>,
-                              "Invalid cpool field type (valid requires WithParseSize<TYPE> (from asm.parser_utils, if "
-                              "mode != NONE))");
+                              "Invalid cpool field type (valid requires WithParseSize<TYPE> (from asm.parser_utils, if mode != NONE))");
 
                 if constexpr (shouldHasCorrectCpool) {
                     classNode.cpool.jaac_set_parse_size(cpool_size);
@@ -129,11 +134,11 @@ export namespace parser {
                 }
             });
 
-            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::AccessFlags, accessFlags);
-            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::CpoolSizeT, thisClass);
-            DEF_EXISTS_GET_AND_FIELD_WRITE(wrappers::CpoolSizeT, superClass);
+            DEF_EXISTS_GET_AND_FIELD_WRITE(containsCPOOL_Parsing, wrappers::AccessFlags, accessFlags);
+            DEF_EXISTS_GET_AND_FIELD_WRITE(containsCPOOL_Parsing, wrappers::CpoolSizeT, thisClass);
+            DEF_EXISTS_GET_AND_FIELD_WRITE(containsCPOOL_Parsing, wrappers::CpoolSizeT, superClass);
 
-            if constexpr (parseLengthFlag >= ParseLength::IFACES) {
+            if constexpr (containsIFACES_Parsing) {
                 DEF_OPT_ARRAY_HANDLE(ifaces, Ifaces, ifaces, {
                     if constexpr (shouldHasCorrectIfaces) {
                         for (ArrayRSizeT i = 0; i < static_cast<ArrayRSizeT>(ifaces_size); ++i) {
@@ -145,20 +150,20 @@ export namespace parser {
                     }
                 });
 
-                if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                if constexpr (containsFIELDS_Parsing) {
                     DEF_OPT_ARRAY_HANDLE(fields, Fields, fields, {
                         DEF_ASSERT_UNEX(parse_MF<shouldHasCorrectFields>(readPtr, classNode.fields, fields_size));
                     });
 
 
-                    if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                    if constexpr (containsMETHODS_Parsing) {
                         DEF_OPT_ARRAY_HANDLE(methods, Methods, methods, {
                             DEF_ASSERT_UNEX(
                                     parse_MF<shouldHasCorrectMethods>(readPtr, classNode.methods, methods_size));
                         });
 
 
-                        if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                        if constexpr (containsFULL_Parsing) {
                             DEF_OPT_ARRAY_HANDLE(attrs, Attrs, attrs, {
                                 DEF_ASSERT_UNEX(
                                         parse_simple_collection<shouldHasCorrectAttrs, common::DefVeryFullAttribute>(
@@ -182,26 +187,27 @@ export namespace parser {
         };
 
         if constexpr (useWriteFlag) {
-            // call handlers (deep analys of version, lol)
+            // call handlers (deep analyse of version, lol)
             DEF_BOOL_CNT_FLAG_GEN(writeVersion);
             cstd::call_if_no_false(
-                    cstd::or_else_falseCPY<writeVersionFlag>(DEF_FIELD_RETURNER(wrappers::VersionNumber, version)));
-            if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
+                    cstd::or_else_falseCPY<writeVersionFlag>(DEF_FIELD_RETURNER(useWriteFlag, wrappers::VersionNumber, version)));
+            if constexpr (containsCPOOL_Parsing) {
                 DEF_BOOL_CNT_FLAG_GEN(writeAccess);
                 DEF_BOOL_CNT_FLAG_GEN(writeThisClassIdx);
                 DEF_BOOL_CNT_FLAG_GEN(writeSuperClassIdx);
+                COM_BOOL SAC0 = useWriteFlag && containsCPOOL_Parsing;
                 cstd::call_if_no_false(cstd::func_or_false_line(
-                        cstd::or_else_falseCPY<writeAccessFlag>(DEF_FIELD_RETURNER(RawAccessFlagsT, accessFlags)),
-                        cstd::or_else_falseCPY<writeThisClassIdxFlag>(DEF_FIELD_RETURNER(CpoolRSizeT, thisClass)),
-                        cstd::or_else_falseCPY<writeSuperClassIdxFlag>(DEF_FIELD_RETURNER(CpoolRSizeT, superClass))));
+                        cstd::or_else_falseCPY<writeAccessFlag>(DEF_FIELD_RETURNER(SAC0, RawAccessFlagsT, accessFlags)),
+                        cstd::or_else_falseCPY<writeThisClassIdxFlag>(DEF_FIELD_RETURNER(SAC0, CpoolRSizeT, thisClass)),
+                        cstd::or_else_falseCPY<writeSuperClassIdxFlag>(DEF_FIELD_RETURNER(SAC0, CpoolRSizeT, superClass))));
                 DEF_ARRAY_PREWRITE_CALL(Cpool, cpool)
-                if constexpr (parseLengthFlag >= ParseLength::IFACES) {
+                if constexpr (containsIFACES_Parsing) {
                     DEF_ARRAY_PREWRITE_CALL(Ifaces, ifaces)
-                    if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                    if constexpr (containsFIELDS_Parsing) {
                         DEF_ARRAY_PREWRITE_CALL(Fields, fields)
-                        if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                        if constexpr (containsMETHODS_Parsing) {
                             DEF_ARRAY_PREWRITE_CALL(Methods, methods)
-                            if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                            if constexpr (containsFULL_Parsing) {
                                 DEF_ARRAY_PREWRITE_CALL(Attrs, attrs)
                             }
                         }
@@ -222,20 +228,20 @@ export namespace parser {
 
             outData.append_range(opcodes::magic_array_rev);
             version.deser(writePtr);
-            if constexpr (parseLengthFlag >= ParseLength::CPOOL) {
+            if constexpr (containsCPOOL_Parsing) {
                 DEF_JAAC_COMPLEX_DESER_SKIP0(Cpool, cpool, wrappers::CpoolSizeT);
 
                 accessFlags.deser(writePtr);
                 thisClass.deser(writePtr);
                 superClass.deser(writePtr);
 
-                if constexpr (parseLengthFlag >= ParseLength::IFACES) {
+                if constexpr (containsIFACES_Parsing) {
                     DEF_JAAC_PRIM_DESER(Ifaces, ifaces, wrappers::CpoolSizeT, wrappers::Number<ArrayRSizeT>);
-                    if constexpr (parseLengthFlag >= ParseLength::FIELDS) {
+                    if constexpr (containsFIELDS_Parsing) {
                         DEF_JAAC_COMPLEX_DESER(Fields, fields, wrappers::ArraySizeT);
-                        if constexpr (parseLengthFlag >= ParseLength::METHODS) {
+                        if constexpr (containsMETHODS_Parsing) {
                             DEF_JAAC_COMPLEX_DESER(Methods, methods, wrappers::ArraySizeT);
-                            if constexpr (parseLengthFlag >= ParseLength::FULL) {
+                            if constexpr (containsFULL_Parsing) {
                                 DEF_JAAC_COMPLEX_DESER(Attrs, attrs, wrappers::ArraySizeT);
                             }
                         }
@@ -243,7 +249,7 @@ export namespace parser {
                 }
             }
 
-            if constexpr (parseLengthFlag < ParseLength::FULL) {
+            if constexpr (!containsFULL_Parsing) {
                 outData.append_range(readPtr);
             }
 
@@ -257,7 +263,6 @@ export namespace parser {
 
     template <typename ClassNT, typename SpecR = cflags::class_file_ptr, typename SpecW = cflags::class_file_ptr,
               bool useFlush = true, bool checkMagic = true, bool g1>
-        requires JaacClassNT<ClassNT>
     ParseRetType<ClassNT> parse(const reader::PreRWFileData<g1> preRWData) noexcept {
         const auto rDataOpt = preRWData.open("rb");
 

@@ -44,7 +44,9 @@ export namespace parser {
 
     template <typename T>
     concept JaacClassNT =
-            REQ_REQ(std::same_as<decltype(T::parseLength), const ParseLength>) && std::is_default_constructible_v<T>;
+            REQ_REQ(std::same_as<decltype(T::parseLength), const ParseLength>) && std::is_default_constructible_v<T> &&
+            CHECK_FIELD_EXISTS_T(T, cpool) && CHECK_FIELD_EXISTS_T(T, ifaces) && CHECK_FIELD_EXISTS_T(T, fields) &&
+            CHECK_FIELD_EXISTS_T(T, methods) && CHECK_FIELD_EXISTS_T(T, attrs);
     // optional:
     // { t.postread_handle() } -> std::same_as<void>;
 
@@ -71,7 +73,9 @@ export namespace parser {
         { t.jaac_reserve(iSize) } -> std::same_as<void>;
         { t.jaac_push_back(inEl) } -> gstd::bool_or_true;
         // ReSharper disable once CppFunctionDoesntReturnValue
-        { t.jaac_emplace_back(cstd::emplacer{[] () -> AddingElT& { }}) } -> gstd::bool_or_true;
+        {
+            t.jaac_emplace_back(cstd::emplacer{[]() -> AddingElT & {}})
+        } -> gstd::bool_or_true;
         { t.jaac_size() } -> std::same_as<size_t>;
         // optional:
         // { t.jaac_start_handle(node) } -> std::same_as<void>;

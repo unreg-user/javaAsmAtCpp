@@ -1,4 +1,5 @@
 #pragma once
+#include "macro.h"
 
 CPP_KOSTYL
 #define WIDSTRUCT_USING(Self, T, Base) \

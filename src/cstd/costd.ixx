@@ -29,6 +29,11 @@ export namespace cstd {
 
     template <typename T>
     concept is_implicit_default_constructable = requires { [] () -> T { return {}; }; };
+    
+    template <typename T>
+    concept is_console_writable = requires (T t, std::ostream& stream) {
+        { stream << t } -> std::same_as<std::ostream&>;
+    };
 
     template <typename T, typename DerefReturnsCowr>
     concept is_opt_t = requires (T t) { requires DerefReturnsCowr::COWR_USE<decltype(*t)>; } && is_ie_covertable<T, bool>; // && is_implicit_convertable<T, std::optional<YCowr>>

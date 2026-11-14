@@ -5,7 +5,6 @@ module;
 #include <span>
 #include <string>
 
-#include <iostream>
 #include "../../cstd/macro.h"
 #include "../parser/parser_mcr.h"
 #include "cp_consts_mcr.h"

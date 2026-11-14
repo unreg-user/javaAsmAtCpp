@@ -42,7 +42,6 @@ target_sources(javaAsmAtCpp
         src/cstd/simple_cstd.ixx
         src/cstd/dstd.ixx
         src/cstd/reader.ixx
-        src/cstd/ptr_function.ixx
         src/cstd/gstd.ixx
         src/cstd/costd.ixx
         src/asm/opcodes.ixx
@@ -58,5 +57,6 @@ target_sources(javaAsmAtCpp
         src/asm/parser/base_classes/parser_b2.ixx
         src/asm/parser/base_classes/parser_wrappers_b2.ixx
         src/asm/parser/mcode/code_attr.ixx
+        src/asm/parser/mcode/label.ixx
         src/compl_flags.ixx
 )

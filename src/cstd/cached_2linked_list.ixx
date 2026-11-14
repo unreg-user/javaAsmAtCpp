@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <iostream>
 #include <optional>
 #include <span>
 #include "macro.h"
@@ -9,17 +8,26 @@ module;
 export module cached_2linked_list;
 
 import simple_cstd;
+import costd;
 
 export namespace c2l_list {
     template <typename ElemT>
     concept LinkedC2ListElement = requires(ElemT element) {
-        { ElemT::create_empty_in_linked2_cached_list() } -> std::convertible_to<ElemT>;
+        { ElemT::create_empty_in_linked2_cached_list() } -> std::same_as<ElemT>;
         { element.destruct_in_linked2_cached_list() } -> std::same_as<void>;
-        { element.is_empty_in_linked2_cached_list() } -> std::convertible_to<bool>;
+        { element.is_empty_in_linked2_cached_list() } -> std::same_as<bool>;
 #ifndef NDEBUG
-        { element.is_valid_new_in_linked2_cached_list() } -> std::convertible_to<bool>;
+        { element.is_valid_new_in_linked2_cached_list() } -> std::same_as<bool>;
         { element.mark_unnew_in_linked2_cached_list() } -> std::same_as<void>;
 #endif
+    };
+
+    template <typename LabelT>
+    concept LinkedC2ListLabel = requires(LabelT label, size_t idx) {
+        LabelT{};
+        { label.is_new() } -> std::same_as<bool>;
+        { label.mark_added() } -> std::same_as<void>;
+        { label.set_idx(idx) } -> std::same_as<void>;
     };
 
     struct Base {
@@ -27,78 +35,119 @@ export namespace c2l_list {
         enum class RemoveMode { AUTO, DESTRUCT, EMPTY };
     };
 
-    template <typename ElementType>
-    struct CList;
+    template <typename, typename, typename>
+    struct AbsCList;
 
-    template <typename ElementType>
+    struct UnindexedLabel {
+        bool isAdded = false;
+
+        constexpr UnindexedLabel() noexcept = default;
+
+        NODISCARD constexpr bool is_new() const noexcept {
+            return isAdded;
+        }
+
+        constexpr void mark_added() noexcept {
+            isAdded = true;
+        }
+
+        static constexpr void set_idx(size_t) noexcept {
+        }
+    };
+
+    struct IndexedLabel {
+        static constexpr size_t unaddedSIdx = static_cast<size_t>(-2);
+        static constexpr size_t addedSIdx = static_cast<size_t>(-1);
+
+        constexpr IndexedLabel() noexcept = default;
+
+        size_t idx = unaddedSIdx;
+
+        NODISCARD constexpr bool is_new() const noexcept {
+            return idx == unaddedSIdx;
+        }
+
+        constexpr void mark_added() noexcept {
+            idx = addedSIdx;
+        }
+
+        constexpr void set_idx(const size_t i) noexcept {
+            idx = i;
+        }
+    };
+
+    template <typename ElementType, typename Label = UnindexedLabel>
     struct BList {
-        template <typename>
+        static_assert(LinkedC2ListLabel<Label> && LinkedC2ListElement<ElementType>);
+
+        template <typename, typename>
         friend struct BList;
 
         struct Node;
 
-        struct NodeBase {
-            static constexpr size_t unaddedSIdx = static_cast<size_t>(-2);
-            static constexpr size_t addedSIdx = static_cast<size_t>(-1);
-
-            ElementType instance;
+        struct BaseNode {
             Node* nextNode = nullptr;
             Node* prevNode = nullptr;
-            size_t sourceIndex = unaddedSIdx;
+            ElementType instance;
+            Label label{};
 
             friend std::ostream& operator<<(std::ostream& os, const Node& self) {
-                os << "Node{" << self.instance << ", " << self.sourceIndex << "}";
+                os << "Node{" << self.instance;
+                if constexpr (cstd::is_console_writable<const Label&>) {
+                    os << ", " << self.label;
+                }
+                os << "}";
                 return os;
             }
 
         protected:
             // ReSharper disable once CppNonExplicitConvertingConstructor
-            constexpr NodeBase(ElementType&& node) noexcept : instance(std::move(node)) {
+            constexpr BaseNode(ElementType&& node) noexcept : instance(std::move(node)) {
             }
         };
 
-        struct Node : protected NodeBase {
+        struct Node : protected BaseNode {
         private:
-            using NodeBase::instance;
-            using NodeBase::nextNode;
-            using NodeBase::prevNode;
-            using NodeBase::sourceIndex;
+            using BaseNode::instance;
+            using BaseNode::nextNode;
+            using BaseNode::prevNode;
 
         public:
-            using NodeBase::addedSIdx;
-            using NodeBase::unaddedSIdx;
+            using BaseNode::label;
 
             friend BList;
-            friend CList<ElementType>;
 
-            /*implicit*/ constexpr operator const NodeBase&() const & noexcept {
+            template <typename, typename, typename>
+            friend struct AbsCList;
+
+            /*implicit*/ constexpr operator const BaseNode&() const& noexcept {
                 return *this;
             }
 
-            /*implicit*/ constexpr operator const NodeBase&&() const && noexcept {
+            /*implicit*/ constexpr operator const BaseNode&&() const&& noexcept {
                 return std::move(*this);
             }
 
-            /*implicit*/ constexpr operator const NodeBase&() & noexcept {
+            /*implicit*/ constexpr operator const BaseNode&() & noexcept {
                 return *this;
             }
 
-            /*implicit*/ constexpr operator const NodeBase&&() && noexcept {
+            /*implicit*/ constexpr operator const BaseNode&&() && noexcept {
                 return std::move(*this);
             }
 
             NODISCARD constexpr bool is_new() const noexcept {
-                return sourceIndex == unaddedSIdx;
+                return label.is_new();
             }
 
             constexpr Node() noexcept : Node(create_empty_element_instance()) {
             }
 
             // ReSharper disable once CppNonExplicitConvertingConstructor
-            constexpr Node(ElementType&& node) noexcept : NodeBase(std::move(node)) {
+            constexpr Node(ElementType&& node) noexcept : BaseNode(std::move(node)) {
 #ifndef NDEBUG
-                assert(node.is_valid_new_in_linked2_cached_list());
-                node.mark_unnew_in_linked2_cached_list();
+                assert(instance.is_valid_new_in_linked2_cached_list());
+                instance.mark_unnew_in_linked2_cached_list();
 #endif
             }
 
@@ -112,7 +161,7 @@ export namespace c2l_list {
 
         private:
             constexpr void mark_added() noexcept {
-                sourceIndex = addedSIdx;
+                return label.mark_added();
             }
 
             constexpr void set_to_empty() noexcept {
@@ -127,22 +176,29 @@ export namespace c2l_list {
             template <bool nextIncludesSelf = false>
             NODISCARD constexpr Node* clear_next_empty_and_get_next_p() noexcept {
                 auto* nextI = nextIncludesSelf ? this : nextNode;
-                if (nextI) {
-                    size_t cleared = 0;
-                    while (nextI && nextI->is_empty()) {
-                        cleared++;
-                        auto nextNextI = nextI->nextNode;
-                        delete nextI;
-                        nextI = nextNextI;
-                    }
-                    if (cleared > 0) {
-                        if constexpr (nextIncludesSelf) {
-                            nextNode = nextI;
-                            if (nextI) {
-                                connect(this, nextI);
-                            }
-                        } else {
+
+                if constexpr (!nextIncludesSelf) {
+                    if (!nextI)
+                        return nullptr;
+                }
+
+                size_t cleared = 0;
+                while (nextI && nextI->is_empty()) {
+                    cleared++;
+                    auto nextNextI = nextI->nextNode;
+                    delete nextI;
+                    nextI = nextNextI;
+                }
+                if (cleared > 0) {
+                    if constexpr (nextIncludesSelf) {
+                        if (nextI) {
                             nextI->prevNode = nullptr;
+                        }
+                    } else {
+                        if (nextI) {
+                            connect(this, nextI);
+                        } else {
+                            this->nextNode = nullptr;
                         }
                     }
                 }
@@ -155,13 +211,46 @@ export namespace c2l_list {
         Node* last = nullptr;
         size_t dynamicSize = 0;
 
+        constexpr void destruct_nodes() noexcept {
+            foreach_link_internal([](const Node* node) noexcept { delete node; });
+        }
+
+        constexpr void clear_fls() noexcept {
+            first = nullptr;
+            last = nullptr;
+            dynamicSize = 0;
+        }
+
     public:
-        BList() noexcept = default;
+        constexpr BList() noexcept = default;
 
         DEL_CPY(BList);
 
-        ~BList() noexcept {
-            foreach_link_internal([](const Node* node) noexcept { delete node; });
+        constexpr ~BList() noexcept {
+            destruct_nodes();
+        }
+
+        constexpr BList(BList&& other) noexcept : first(other.first), last(other.last), dynamicSize(other.dynamicSize) {
+            other.clear_fls();
+        }
+
+    protected:
+        constexpr BList(Node* first, Node* last, const size_t dynamicSize) noexcept :
+            first(first), last(last), dynamicSize(dynamicSize) {
+        }
+
+    public:
+        BList& operator=(BList&& other) noexcept {
+            if (this != &other) {
+                destruct_nodes();
+
+                first = other.first;
+                last = other.last;
+                dynamicSize = other.dynamicSize;
+
+                other.clear_fls();
+            }
+            return *this;
         }
 
         template <bool inStart = false>
@@ -197,22 +286,28 @@ export namespace c2l_list {
                     last = otherList.last;
                 }
 
-                otherList.first = nullptr;
                 dynamicSize += otherList.dynamicSize;
+                otherList.clear_fls();
             }
         }
 
-        constexpr void clear_empty() noexcept {
-            if (first)  {
-                first = first->template clear_next_empty_and_get_next_p<true>();
-                Node* node = first;
+        /** updates cache */
+        template <typename Self>
+        constexpr void clear_empty(this Self&& self) noexcept {
+            if constexpr (requires {
+                              { self.to_array() } -> std::same_as<void>;
+                          }) {
+                self.to_array();
+            } else if (self.first) {
+                self.first = self.first->template clear_next_empty_and_get_next_p<true>();
+                Node* node = self.first;
                 Node* preNode = nullptr;
 
                 while (node) {
                     preNode = node;
                     node = node->clear_next_empty_and_get_next_p();
                 }
-                last = preNode;
+                self.last = preNode;
             }
         }
 
@@ -229,7 +324,7 @@ export namespace c2l_list {
         }
 
         constexpr void foreach_link(this auto&& self, auto&& callable) noexcept {
-            self.foreach_link_internal([&](Node* node) { callable(node->get_data()); });
+            self.foreach_link_internal([&](const Node* node) { callable(node->instance); });
         }
 
     protected:
@@ -294,26 +389,28 @@ export namespace c2l_list {
         constexpr void insert(BList&& otherList, Node* const sideNode) noexcept {
             assert(sideNode);
 
-            if constexpr (before) {
-                auto& nextNode = sideNode;
-                if (first == nextNode) {
-                    append<before>(std::move(otherList));
-                    return;
+            if (otherList.first) {
+                if constexpr (before) {
+                    auto& nextNode = sideNode;
+                    if (first == nextNode) {
+                        append<before>(std::move(otherList));
+                        return;
+                    }
+
+                    connect(nextNode->prevNode, otherList, nextNode);
+                } else {
+                    auto& prevNode = sideNode;
+                    if (last == prevNode) {
+                        append<before>(std::move(otherList));
+                        return;
+                    }
+
+                    connect(prevNode, otherList, prevNode->nextNode);
                 }
 
-                connect(nextNode->prevNode, otherList, nextNode);
-            } else {
-                auto& prevNode = sideNode;
-                if (last == prevNode) {
-                    append<before>(std::move(otherList));
-                    return;
-                }
-
-                connect(prevNode, otherList, prevNode->nextNode);
+                dynamicSize += otherList.dynamicSize;
+                otherList.clear_fls();
             }
-
-            otherList.first = nullptr;
-            dynamicSize += otherList.dynamicSize;
         }
 
         template <bool inStart = false, bool ignoreIfElse = true, Base::RemoveMode mode = Base::RemoveMode::AUTO>
@@ -363,7 +460,7 @@ export namespace c2l_list {
         template <Base::RemoveMode mode = Base::RemoveMode::AUTO>
         static constexpr void remove_unchecked_internal(Node* const node) noexcept {
             if constexpr (mode == Base::RemoveMode::AUTO) {
-                if (node->sourceIndex == Node::addedSIdx) {
+                if (!node->is_new()) {
                     delete node;
                 } else {
                     node->set_to_empty();
@@ -391,51 +488,51 @@ export namespace c2l_list {
         }
     };
 
-    template <typename ElementType>
-    struct CList : BList<ElementType> {
-        using BListType = BList<ElementType>;
-        using typename BListType::Node;
-        using Nodes = std::span<Node*>;
+    template <typename Nodes, typename ElementType, typename Label = UnindexedLabel>
+    struct AbsCList : BList<ElementType, Label> {
+        using BListT = BList<ElementType, Label>;
+        using typename BListT::BaseNode;
+        using typename BListT::Node;
 
     protected:
-        using BListType::dynamicSize;
-        using BListType::first;
-        using BListType::last;
+        using BListT::dynamicSize;
+        using BListT::first;
+        using BListT::last;
+        Nodes cache{};
 
-        Nodes cache = {};
+        constexpr AbsCList(Node* first, Node* last, const size_t dynamicSize, Nodes&& cache) noexcept :
+            BListT{first, last, dynamicSize}, cache(std::move(cache)) {
+        }
 
     public:
-        explicit constexpr CList() noexcept = default;
-        explicit constexpr CList(BListType&& bList) : BListType{std::move(bList)} {
+        constexpr AbsCList() noexcept = default;
+
+        explicit constexpr AbsCList(BListT&& bList) noexcept : BListT{std::move(bList)} {
         }
 
-        ~CList() noexcept {
-            delete[] cache.data();
-        }
-
-        template <bool sourceIndexUpdate = true>
-        constexpr auto to_span() noexcept {
-            delete[] cache.data();
-            auto* array = new Node*[dynamicSize];
-            auto* j = array;
-            first = first->template clear_next_empty_and_get_next_p<true>();
-            auto* node = first;
-            if (node) {
-                for (size_t i = 0; i < dynamicSize; ++i, ++j) {
-                    *j = node;
-                    if constexpr (sourceIndexUpdate) {
-                        node->sourceIndex = i;
+        template <bool sourceIdxUpdate = true>
+        constexpr auto to_array(this auto&& self) noexcept {
+            self.clear_cache();
+            auto array = self.alloc_new_nodes_array();
+            if (first) {
+                first = first->template clear_next_empty_and_get_next_p<true>();
+                auto* node = first;
+                if (node) {
+                    for (size_t i = 0; i < dynamicSize; ++i) {
+                        array[i] = node;
+                        if constexpr (sourceIdxUpdate) {
+                            node->sourceIdx = i;
+                        }
+                        node = node->clear_next_empty_and_get_next_p();
                     }
-                    node = node->clear_next_empty_and_get_next_p();
+                    last = array[dynamicSize - 1];
                 }
-                last = *(--j);
             }
-            cache = {array, dynamicSize};
-            return cache;
+            return self.return_cache_by_array(std::move(array));
         }
 
-        NODISCARD constexpr auto get_cache_span() const noexcept {
-            return cache;
+        NODISCARD constexpr decltype(auto) get_cache(this auto&& self) noexcept {
+            return std::forward_like<decltype(self)>(self.cache);
         }
 
         template <Base::OffsetSide side>
@@ -454,36 +551,187 @@ export namespace c2l_list {
         }
 
         template <bool before = false>
-        constexpr void insert(const size_t index, ElementType&& element) noexcept {
+        constexpr void insert(ElementType&& element, const size_t index) noexcept {
             assert(index < cache.size());
-            insert<before>(cache[index], new Node{std::move(element)});
+            BListT::template insert<before>(new Node{std::move(element)}, cache[index]);
         }
 
         template <bool before = false>
-        constexpr void insert(const size_t index, BListType&& list) noexcept {
+        constexpr void insert(BListT&& list, const size_t index) noexcept {
             assert(index < cache.size());
-            BListType::template insert<before>(std::move(list), cache[index]);
+            BListT::template insert<before>(std::move(list), cache[index]);
         }
 
         constexpr void remove(const size_t index) noexcept {
             auto node = cache[index];
 
             if (node == first) {
-                BListType::template pop_internal<true, false, Base::RemoveMode::EMPTY>();
+                BListT::template pop_internal<true, false, Base::RemoveMode::EMPTY>();
             } else if (node == last) {
-                BListType::template pop_internal<false, false, Base::RemoveMode::EMPTY>();
+                BListT::template pop_internal<false, false, Base::RemoveMode::EMPTY>();
             } else {
-                BListType::connect(node->prevNode, node->nextNode);
-                BListType::template remove_unchecked_internal<Base::RemoveMode::EMPTY>(node);
+                BListT::connect(node->prevNode, node->nextNode);
+                BListT::template remove_unchecked_internal<Base::RemoveMode::EMPTY>(node);
                 --dynamicSize;
             }
         }
 
+        constexpr AbsCList(AbsCList&& other) noexcept : BListT(std::move(other)), cache(other.cache) {
+            other.cache = {};
+        }
+
+        constexpr AbsCList& operator=(this auto&& self, AbsCList&& other) noexcept {
+            if (&self != &other) {
+                self.clear_cache();
+                BListT::operator=(std::move(other));
+                self.cache = std::move(other.cache);
+            }
+            return self; // NOLINT(*-unconventional-assign-operator)
+        }
+
     protected:
         template <bool before = false>
-        constexpr void insert(const size_t index, Node* const node) noexcept {
+        constexpr void insert(Node* const node, const size_t index) noexcept {
             assert(index < cache.size());
-            BListType::template insert<before>(node, cache[index]);
+            BListT::template insert<before>(node, cache[index]);
+        }
+    };
+
+    template <typename, typename>
+    struct CList;
+
+    template <typename ElementType, typename Label = UnindexedLabel>
+    struct CListB : AbsCList<cstd::impl_dest_u_vec<typename BList<ElementType, Label>::Node*>, ElementType, Label> {
+        using VecElT = BList<ElementType, Label>::Node*;
+
+    protected:
+        using RawVecT = std::vector<VecElT>;
+        using VecT = cstd::impl_dest_u_vec<VecElT>;
+
+    private:
+        using Base = AbsCList<VecT, ElementType, Label>;
+
+    protected:
+        using Base::BListT;
+        using Base::cache;
+        using Base::dynamicSize;
+        using Base::first;
+        using Base::last;
+        size_t vecDynamicSize = 0;
+
+    public:
+        using Base::Base;
+        using typename Base::BaseNode;
+        using typename Base::Node;
+        using Base::operator=;
+
+        constexpr CListB() noexcept = default;
+
+        constexpr ~CListB() noexcept {
+            std::destroy_at(&cache.v);
+        }
+
+        constexpr explicit operator CList<ElementType, Label>() && {
+            auto result =
+                    CList<ElementType, Label>{first, last, dynamicSize, std::span<VecElT>{cache.begin(), dynamicSize}};
+            cache = {};
+            this->clear_fls();
+            return result;
+        }
+
+        constexpr void resize(size_t size) noexcept {
+            cache.v.resize(size);
+            first = getNodeAt(0);
+            last = getNodeAt(size - 1);
+        }
+
+        constexpr void push_back(ElementType&& element) noexcept {
+            auto vecRealSize = cache.v.size();
+            assert(vecDynamicSize < vecRealSize);
+
+            auto& currentNodeRef = cache.v[vecDynamicSize];
+            currentNodeRef = new Node{std::move(element)};
+            if (vecDynamicSize > 0) {
+                this->connect(cache.v[vecDynamicSize - 1], currentNodeRef);
+            } else {
+                first = currentNodeRef;
+            }
+
+            ++vecDynamicSize;
+            ++dynamicSize;
+
+            if (vecDynamicSize == vecRealSize) {
+                last = currentNodeRef;
+            }
+
+            currentNodeRef->mark_added();
+        }
+
+        constexpr auto getNodeAt(size_t i) noexcept {
+            return cache.v[i];
+        }
+
+    protected:
+        constexpr void clear_cache() noexcept {
+            cache.v.clear();
+        }
+
+        constexpr auto alloc_new_nodes_array() noexcept {
+            vecDynamicSize = dynamicSize;
+            RawVecT vec{};
+            vec.resize(dynamicSize);
+            return vec;
+        }
+
+        constexpr auto return_cache_by_array(RawVecT&& array) noexcept {
+            cache = VecT{std::move(array)};
+            return cache;
+        }
+    };
+
+    template <typename ElementType, typename Label = UnindexedLabel>
+    struct CList : AbsCList<std::span<typename BList<ElementType, Label>::Node*>, ElementType, Label> {
+        template <typename, typename>
+        friend struct CListB;
+
+    private:
+        using SpanElT = BList<ElementType, Label>::Node*;
+        using SpanT = std::span<SpanElT>;
+        using Base = AbsCList<SpanT, ElementType, Label>;
+
+    protected:
+        using Base::BListT;
+        using Base::cache;
+        using Base::dynamicSize;
+        using Base::first;
+        using Base::last;
+
+    public:
+        using Base::Base;
+        using typename Base::BaseNode;
+        using typename Base::Node;
+        using Base::operator=;
+
+        constexpr CList() noexcept = default;
+
+    protected:
+        constexpr void clear_cache() noexcept {
+            delete[] cache.data();
+        }
+
+    public:
+        constexpr ~CList() noexcept {
+            clear_cache();
+        }
+
+    protected:
+        constexpr Node** alloc_new_nodes_array() noexcept {
+            return new Node*[dynamicSize];
+        }
+
+        constexpr auto return_cache_by_array(Node** array) noexcept {
+            cache = SpanT{array, dynamicSize};
+            return cache;
         }
     };
 } // namespace c2l_list

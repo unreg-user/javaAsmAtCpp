@@ -2,7 +2,7 @@ module;
 
 #include <iostream>
 #include "../../../cstd/macro.h"
-#include "../../impl_base/insns_mcr.h"
+#include "insns_mcr.h"
 
 export module insns;
 
@@ -51,7 +51,7 @@ namespace insn {
         struct AnyInsnNode : AnyInsnNodeBase {
             using AnyInsnNodeBase::AnyInsnNodeBase;
 
-            template <typename>
+            template <typename, typename>
             friend struct c2l_list::BList;
 
         private:
@@ -78,7 +78,8 @@ namespace insn {
             }
         };
 
-        using CList = c2l_list::CList<AnyInsnNode>;
-        using BList = c2l_list::BList<AnyInsnNode>;
+        using InsnCList = c2l_list::CList<AnyInsnNode>;
+        using InsnCListB = c2l_list::CListB<AnyInsnNode>;
+        using InsnBList = c2l_list::BList<AnyInsnNode>;
     }
 }

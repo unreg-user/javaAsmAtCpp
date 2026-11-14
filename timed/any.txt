@@ -1518,3 +1518,82 @@ struct ClassN6 {
 template <bool hasNullptr = false, typename... DerefTypes>
 using deref_to_ref_variant =
         std::conditional_t<hasNullptr, std::variant<nullptr_t, DerefTypes*...>, std::variant<DerefTypes*...>>;
+
+
+    namespace internal {
+        template <typename NodeT>
+        struct LabelByNode : gstd::widstruct<NodeT*> {
+        private:
+            using Base = gstd::widstruct<NodeT>;
+            using WidT = NodeT*;
+        public:
+
+            WIDSTRUCT_USING(LabelByNode, WidT, Base);
+        };
+    }
+
+
+    template <typename T>
+    constexpr decltype(auto) forward_from_cpy(T value) {
+        if constexpr (std::is_rvalue_reference_v<T>) {
+            return static_cast<T&&>(value);
+        } else if constexpr (std::is_lvalue_reference_v<T>) {
+            return static_cast<T&>(value);
+        } else {
+            return value;
+        }
+    }
+
+
+#define DEF_DEF_CREATE(mPrefix, Self) \
+    template <typename SpecR>\
+    NODISCARD static std::optional<Self> mPrefix##parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return readPtr.template parse_rev<Self>(); \
+    }
+
+#define DEF_DEF_CHECK_AND_MOVE(mPrefix, Self) \
+    template <typename SpecR> \
+    NODISCARD static constexpr bool mPrefix##check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return readPtr.template check_and_move<Self>(); \
+    }
+
+#define DEF_DEF_DESER_MTH(mPrefix, ...) \
+    template <typename SpecW> \
+    void mPrefix##deser(parser::WritePtrBySpec<SpecW>& writePtr) const noexcept { \
+        reader::utils::deser_rev(writePtr, __VA_ARGS__); \
+    }
+
+#define DEF_CREATE(Self) DEF_DEF_CREATE(, Self)
+#define DEF_CHECK_AND_MOVE(Self) DEF_DEF_CHECK_AND_MOVE(, Self)
+#define DEF_DESER_MTH(...) DEF_DEF_DESER_MTH(, __VA_ARGS__)
+
+#define DEF_R_METHODS(Self) DEF_CREATE(Self) DEF_CHECK_AND_MOVE(Self)
+#define DEF_METHODS(Self, ...) DEF_CREATE(Self) DEF_CHECK_AND_MOVE(Self) DEF_DESER_MTH(__VA_ARGS__)
+
+#define DEF_ABS_CREATE(Self) DEF_DEF_CREATE(abs_, Self)
+#define DEF_ABS_CHECK_AND_MOVE(Self) DEF_DEF_CHECK_AND_MOVE(abs_, Self)
+#define DEF_ABS_DESER(...) DEF_DEF_DESER_MTH(abs_ , __VA_ARGS__)
+
+/** read */
+#define DEF_ABS_R_METHODS(Self) DEF_ABS_CREATE(Self) DEF_ABS_CHECK_AND_MOVE(Self)
+#define DEF_ABS_METHODS_PACK(Self, ...) protected: DEF_ABS_R_METHODS(Self) public: DEF_DESER_MTH(__VA_ARGS__)
+
+#define DEF_ABS_EXT_CREATE(Self) \
+    template <typename SpecR> \
+    NODISCARD static std::optional<Self> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return Self::template abs_parse<SpecR>(readPtr).transform(cstd::ext_cast_lambda<Self>); \
+    }
+
+#define DEF_ABS_EXT_CHECK_AND_MOVE(Self) \
+    template <typename SpecR> \
+    NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept { \
+        return Self::template abs_check_and_move<SpecR>(readPtr); \
+    }
+
+#define DEF_ABS_EXT_R_METHODS(Self) DEF_ABS_EXT_CREATE(Self) DEF_ABS_EXT_CHECK_AND_MOVE(Self)
+
+
+    template <typename Sym>
+    FileDataWithSize<Sym> convertToFileDataWS(std::vector<Sym>& vec) noexcept {
+        return FileDataWithSize<Sym>{vec.data(), vec.size()};
+    }

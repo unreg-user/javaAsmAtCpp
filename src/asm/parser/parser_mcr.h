@@ -28,15 +28,15 @@
 #define CHECK_METHOD_EXISTS_T(type, name) REQ_REQ(cstd::is_func_ptr<decltype(&type::name)>)
 #define CHECK_METHOD_EXISTS(instance, name) CHECK_METHOD_EXISTS_T(decltype(instance), name)
 #define CHECK_FIELD_EXISTS(instance, name) REQ_REQ(!cstd::is_func_ptr<decltype(&instance.name)>)
-#define CHECK_FIELD_EXISTS_T(type, name) CHECK_FIELD_EXISTS(std::declval<type>(), name)
+#define CHECK_FIELD_EXISTS_T(type, name) requires (type instance) { requires CHECK_FIELD_EXISTS(instance, name); }
 
 #define CONSTEXPR_TERN_OP(cond, ret1, ret2) [&] () -> decltype(auto) { if constexpr (cond) { return (ret1); } else { return (ret2); } } ()
 
-#define COM_ARRAY_HANDLE(uName, path, errTxt, ...) \
+#define COM_ARRAY_HANDLE(SAC, uName, path, errTxt, ...) \
         DEF_CNT_FLAG_GEN(handleMode##uName, HandleMode); \
         COM_BOOL hasCorrect##uName = REQ_REQ(__VA_ARGS__); \
         COM_BOOL shouldHasCorrect##uName = (handleMode##uName##Flag == HandleMode::FULL); \
-        static_assert(!shouldHasCorrect##uName || hasCorrect##uName, errTxt); \
+        static_assert(!SAC || (!shouldHasCorrect##uName || hasCorrect##uName), errTxt); \
         COM_BOOL hasCorrectTranslate##uName = REQ_REQ(JaacTranslator<decltype(classNode.path)>);
 
 #define OPT_ARRAY_HANDLE_INIT(name, uName, path, sizeT) \
@@ -45,7 +45,8 @@
 
 #define DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path) OPT_ARRAY_HANDLE_INIT(name, uName, path, wrappers::ArraySizeT)
 
-#define DEF_COM_ARRAY_HANDLE(uName, path, inElT) COM_ARRAY_HANDLE(uName, path, "Invalid "#path" field type (valid requires JaacCollection<., "#inElT"> (from asm.parser_concepts, if mode == FULL))", JaacCollection<decltype(classNode.path), inElT>)
+#define DEF_COM_ARRAY_HANDLE(SAC, uName, path, inElT) COM_ARRAY_HANDLE(SAC, uName, path, "Invalid "#path" field type (valid requires JaacCollection<., "#inElT"> (from asm.parser_concepts, if mode == FULL))", JaacCollection<decltype(classNode.path), inElT>)
+#define LENGTH_BOOL_GEN(S_NAME) COM_BOOL contains##S_NAME##_Parsing = parseLengthFlag >= ParseLength::S_NAME;
 
 #define DEF_MIDDLE_END_ARRAY_HANDLE_PART(name, uName, path, ...) \
         if constexpr (handleMode##uName##Flag != HandleMode::NONE) { \
@@ -99,17 +100,17 @@
         return false; \
     }
 
-#define FIELD_HANDLE_OUTER(path, ...) [&] { \
-    COM_BOOL timed_pre1 = CHECK_FIELD_EXISTS(classNode, path); \
+#define FIELD_HANDLE_OUTER(SAC, path, ...) [&] { \
+    COM_BOOL timed_pre1 = SAC && CHECK_FIELD_EXISTS(classNode, path); \
     if constexpr (timed_pre1) { \
         __VA_ARGS__; \
     } else { \
         return false; \
     } } ()
 
-#define FIELD_WRITER(name, path, Type, oldInst) FIELD_HANDLE_OUTER(path, FIELD_WRITER_INNER(name, path, Type, oldInst, timed_pre1))
+#define FIELD_WRITER(SAC, name, path, Type, oldInst) FIELD_HANDLE_OUTER(SAC, path, FIELD_WRITER_INNER(name, path, Type, oldInst, timed_pre1))
 
-#define FIELD_RETURNER(name, path, Type, oldInst) FIELD_HANDLE_OUTER(path, FIELD_RETURNER_INNER(name, path, Type, oldInst, timed_pre1))
+#define FIELD_RETURNER(SAC, name, path, Type, oldInst) FIELD_HANDLE_OUTER(SAC, path, FIELD_RETURNER_INNER(name, path, Type, oldInst, timed_pre1))
 
 #define DEF_CHECK_METHOD_EXISTS(name) CHECK_METHOD_EXISTS(classNode, name)
 #define DEF_CHECK_FIELD_EXISTS(name) CHECK_FIELD_EXISTS(classNode, name)
@@ -124,7 +125,7 @@
 #define DEF_OR_ELSE_RET_FALSE(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return false;)
 #define DEF_CHECK_MEMORY_OR_UNEX(bytes) { bool val = readPtr.check_and_move(bytes); assert(val); if (!val) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
 
-#define DEF_FIELD_WRITER(type, name) FIELD_WRITER(name, name, type, name)
-#define DEF_EXISTS_GET_AND_FIELD_WRITE(type, name) DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(type, name);
-#define DEF_GET_AND_FIELD_WRITE(type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(type, name);
-#define DEF_FIELD_RETURNER(type, name) FIELD_RETURNER(name, name, type, name)
+#define DEF_FIELD_WRITER(SAC, type, name) FIELD_WRITER(SAC, name, name, type, name)
+#define DEF_EXISTS_GET_AND_FIELD_WRITE(SAC, type, name) DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(SAC, type, name);
+#define DEF_GET_AND_FIELD_WRITE(SAC, type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(SAC, type, name);
+#define DEF_FIELD_RETURNER(SAC, type, name) FIELD_RETURNER(SAC, name, name, type, name)

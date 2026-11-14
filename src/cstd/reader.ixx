@@ -14,8 +14,17 @@ import simple_cstd;
 import gstd;
 
 export namespace reader {
+    NODISCARD F_INLINE FILE* open_file(const std::filesystem::path& path, const std::string_view mode) noexcept {
+#ifdef _WIN32
+        const std::wstring w_mode(mode.begin(), mode.end());
+        return _wfopen(path.c_str(), w_mode.c_str());
+#else
+        return std::fopen(path.c_str(), mode.data());
+#endif
+    }
+
     namespace mixins {
-        struct FileDataMxn {
+        struct FileDataPMxn {
             void unchecked_close(this auto&& self) noexcept {
                 free(self.data);
             }
@@ -23,56 +32,84 @@ export namespace reader {
     } // namespace mixins
 
     template <typename Sym = uint8_t>
-    struct FileData : mixins::FileDataMxn {
-        Sym* data;
+    struct FileData : mixins::FileDataPMxn {
+        Sym* data = nullptr;
+
+        explicit constexpr FileData(Sym* data) noexcept : data(data) {
+        }
+
+        constexpr FileData() noexcept = default;
     };
 
     template <typename Sym = uint8_t>
-    struct FileDataWithSize : mixins::FileDataMxn {
-        Sym* data;
-        size_t size;
+    struct FileDataWithSize : mixins::FileDataPMxn {
+        Sym* data = nullptr;
+        size_t rawSize = 0;
 
-        FileDataWithSize(FileData<Sym> fileData, const size_t size) noexcept : data(fileData.data), size(size) {
+        FileDataWithSize(FileData<Sym> fileData, const size_t size) noexcept : data(fileData.data), rawSize(size) {
         }
 
-        FileDataWithSize(Sym* data, const size_t size) noexcept : data(data), size(size) {
+        FileDataWithSize(Sym* data, const size_t size) noexcept : data(data), rawSize(size) {
         }
 
-        explicit operator FileData<Sym>() const noexcept {
+        constexpr FileDataWithSize() noexcept = default;
+
+        /*implicit*/ operator FileData<Sym>() const noexcept {
             return FileData<Sym>{data};
+        }
+
+        /*implicit*/ operator std::span<Sym>() const noexcept {
+            assert(rawSize % sizeof(Sym) == 0);
+            return {data, rawSize / sizeof(Sym)};
         }
     };
 
-    struct RWFileData {
-        static constexpr int seek_set = SEEK_SET;
-        static constexpr int seek_cur = SEEK_CUR;
-        static constexpr int seek_end = SEEK_END;
+    enum class IfBadSize {
+        ASSERT, CHECK_AND_NULL, ADD_ALIGNMENT
+    };
 
+    struct RWFileData {
+        static constexpr int seekSet = SEEK_SET;
+        static constexpr int seekCur = SEEK_CUR;
+        static constexpr int seekEnd = SEEK_END;
+
+        std::filesystem::path path;
         FILE* file;
 
-        template <typename Sym = uint8_t, bool ReturnWithSize = true, bool AddEmptySymbolInEnd = true>
+        template <typename Sym = uint8_t, bool returnWithSize = true, bool addEmptySymbolsInEnd = true, IfBadSize ifBadSize = IfBadSize::CHECK_AND_NULL>
         NODISCARD inline auto read_file() const noexcept {
             assert(file != nullptr);
 
-            fseek(file, 0, seek_end);
-            const size_t size = ftell(file);
-            fseek(file, 0, seek_set);
+            const size_t size = std::filesystem::file_size(path);
 
-            size_t sizeWithEmptySymbol;
-            if constexpr (AddEmptySymbolInEnd) {
-                sizeWithEmptySymbol = size + 1;
+            size_t sizeWithEmptySymbol = size;
+            if constexpr (addEmptySymbolsInEnd) {
+                sizeWithEmptySymbol += sizeof(Sym);
+            }
+            if constexpr (ifBadSize == IfBadSize::ASSERT) {
+                assert(sizeWithEmptySymbol % sizeof(Sym) == 0);
+            } else if constexpr (ifBadSize == IfBadSize::CHECK_AND_NULL) {
+                if (sizeWithEmptySymbol % sizeof(Sym) != 0) [[unlikely]] {
+                    if constexpr (returnWithSize) {
+                        return FileDataWithSize<Sym>{nullptr, 0};
+                    } else {
+                        return FileData<Sym>{nullptr};
+                    }
+                }
             } else {
-                sizeWithEmptySymbol = size;
+                sizeWithEmptySymbol += (sizeof(Sym) - sizeWithEmptySymbol % sizeof(Sym)) % sizeof(Sym);
             }
 
             const auto data = std::bit_cast<Sym*>(malloc(sizeWithEmptySymbol));
             fread(data, 1, size, file);
 
-            if constexpr (AddEmptySymbolInEnd) {
-                data[size] = '\0';
+            if constexpr (addEmptySymbolsInEnd) {
+                for (size_t i = size; i < sizeWithEmptySymbol; ++i) {
+                    data[i] = '\0';
+                }
             }
 
-            if constexpr (ReturnWithSize) {
+            if constexpr (returnWithSize) {
                 return FileDataWithSize<Sym>{data, size};
             } else {
                 return FileData<Sym>{data};
@@ -82,7 +119,7 @@ export namespace reader {
         template <typename Sym>
         inline auto raw_write_file(FileDataWithSize<Sym>&& data) const noexcept {
             assert(file != nullptr);
-            return fwrite(data.data, sizeof(Sym), data.size, file);
+            return fwrite(data.data, sizeof(Sym), data.rawSize, file);
         }
 
         template <typename Sym>
@@ -101,20 +138,20 @@ export namespace reader {
         }
     };
 
-    template <bool CheckExits = true>
+    template <bool checkExits = true>
     struct PreRWFileData {
-        const char* path;
+        std::filesystem::path path;
 
         NODISCARD std::optional<RWFileData> open(const char* mode) const noexcept {
-            FILE* file = fopen(path, mode);
+            FILE* file = open_file(path, mode);
 
-            if constexpr (CheckExits) {
+            if constexpr (checkExits) {
                 if (!file) [[unlikely]] {
                     return std::nullopt;
                 }
             }
 
-            return std::optional{RWFileData{file}};
+            return std::optional{RWFileData{.path = path, .file = file}};
         }
     };
 
@@ -130,9 +167,6 @@ export namespace reader {
     struct ReadPtr {
         Sym* i;
         Sym* endPtr;
-
-        /*implicit*/ ReadPtr(FileDataWithSize<Sym> data) noexcept : i(data.data), endPtr(data.data + data.size) {
-        }
 
         /*implicit*/ ReadPtr(std::span<Sym> data) noexcept : i(data.data()), endPtr(data.data() + data.size()) {
         }
@@ -169,7 +203,7 @@ export namespace reader {
         }
 
         template <typename Type>
-        NODISCARD F_INLINE bool memcpy(Type* to) noexcept {
+        NODISCARD F_INLINE bool memcpy(Type& to) noexcept {
             static_assert(sizeof(Type) % sizeof(Sym) == 0, "cannot containing in symbols");
             static constexpr auto typeS = sizeof(Type) / sizeof(Sym);
 
@@ -179,7 +213,7 @@ export namespace reader {
                 }
             }
 
-            std::memcpy(to, i, typeS);
+            std::memcpy(&to, i, sizeof(Type));
             i += typeS;
             return true;
         }
@@ -187,7 +221,7 @@ export namespace reader {
         template <typename Type, typename Callable>
         NODISCARD F_INLINE std::optional<Type> parse_via_func(Callable&& callable) noexcept {
             Type to;
-            const bool cpyResult = memcpy(&to);
+            const bool cpyResult = memcpy(to);
 
             if constexpr (FlagsStruct::CheckMemorySize) {
                 if (!cpyResult) [[unlikely]] {
@@ -243,7 +277,7 @@ export namespace reader {
         template <size_t bytes>
         NODISCARD F_INLINE bool check_and_move() noexcept {
             static_assert(bytes % sizeof(Sym) == 0, "cannot contain in symbols");
-            return check_and_move_symbols<bytes>();
+            return check_and_move_symbols<bytes / sizeof(Sym)>();
         }
 
         template <typename Type>
@@ -319,9 +353,4 @@ export namespace reader {
             return {};
         }
     };
-
-    template <typename Sym>
-    FileDataWithSize<Sym> convertToFileDataWS(std::vector<Sym>& vec) noexcept {
-        return FileDataWithSize<Sym>{vec.data(), vec.size()};
-    }
 } // namespace reader

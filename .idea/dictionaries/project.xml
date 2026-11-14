@@ -95,6 +95,7 @@
       <w>lsub</w>
       <w>lushr</w>
       <w>lxor</w>
+      <w>maxs</w>
       <w>monitorenter</w>
       <w>monitorexit</w>
       <w>multianewarray</w>

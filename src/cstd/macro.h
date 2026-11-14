@@ -21,11 +21,17 @@
 #define UNION_CONSTR(uName, fieldName) uName(decltype(fieldName) fieldName) noexcept : fieldName(fieldName) {};
 #define UNION_CONSTR_EXPLTYPE(uName, fieldType, fieldName) uName(fieldType fieldName) noexcept : fieldName(fieldName) {};
 #define DEL_CPY(tName) \
-        tName(const tName&) = delete; \
-        tName& operator=(const tName&) = delete;
+        constexpr tName(const tName&) noexcept = delete; \
+        constexpr tName& operator=(const tName&) noexcept = delete;
 
 #define F_INLINE __attribute__((always_inline))
 #define ALLOCATOR __attribute__((malloc))
+
+#ifdef _MSC_VER
+    #define NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+    #define NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
 
 #define CSFLAG static constexpr bool
 #define OR_ELSE_OPT_DECLARED(type, name, opt_value, ...) { auto timed = opt_value; if (!timed) [[unlikely]] { __VA_ARGS__ }; name = *timed; }
@@ -82,15 +88,5 @@ namespace macro_internal {
     ((void)( \
         (!!(expression)) ? 0 : (macro_internal::_dassert(#expression, __FILE__, (unsigned)(__LINE__), "" __VA_OPT__(__VA_ARGS__)), 0) \
     ))
-
-/*
-#include <utility>
-
-#ifdef NDEBUG
-    #define cassert(expression) ((!expression) ? std::unreachable() : (void)0)
-#else
-    #define cassert(expression) assert(expression);
-#endif
-*/
 
 

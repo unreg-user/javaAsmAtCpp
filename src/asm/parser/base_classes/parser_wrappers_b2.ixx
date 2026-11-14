@@ -16,21 +16,21 @@ export namespace parser::wrappers {
     template <typename Self, typename T>
     struct NumberStaticMethods {
         template <typename SpecR>
-        F_INLINE static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) {
+        F_INLINE static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
             auto optT = readPtr.template parse_rev<T>();
             if (!optT) [[unlikely]] return std::nullopt;
             return std::optional{Self{*optT}};
         }
 
         template <typename SpecR>
-        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) {
+        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
             return readPtr.template check_and_move<T>();
         }
     };
 
     struct NumberNonstaticMethods {
         template <typename SpecW>
-        F_INLINE gstd::true_void deser(this auto self, WritePtrBySpec<SpecW>& writePtr) const {
+        F_INLINE gstd::true_void deser(this auto self, WritePtrBySpec<SpecW>& writePtr) noexcept {
             writePtr.deser_rev(self.instance);
             return {};
         }

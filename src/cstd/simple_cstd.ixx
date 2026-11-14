@@ -36,8 +36,7 @@ export namespace cstd {
     };
 
     template <typename T1, typename T2>
-    using CopyRef = std::conditional_t<std::is_lvalue_reference_v<T1>, std::remove_reference_t<T2>&,
-                                       std::remove_reference_t<T2>&&>;
+    using CopyRef = std::conditional_t<std::is_lvalue_reference_v<T1>, T2&, T2&&>;
 
     template <typename T, size_t than>
     concept larger_than = sizeof(T) > than;
@@ -282,17 +281,6 @@ export namespace cstd {
         }
     }
 
-    template <typename T>
-    constexpr decltype(auto) forward_from_cpy(T value) {
-        if constexpr (std::is_rvalue_reference_v<T>) {
-            return static_cast<T&&>(value);
-        } else if constexpr (std::is_lvalue_reference_v<T>) {
-            return static_cast<T&>(value);
-        } else {
-            return value;
-        }
-    }
-
     constexpr void add_reserve(auto& vec, size_t size) {
         vec.reserve(vec.size() + size);
     }
@@ -319,20 +307,61 @@ export namespace cstd {
             return static_cast<Base&&>(*this);
         }
 
-        /*implicit*/ operator const Base&() const & {
+        /*implicit*/ operator const Base&() const& {
             return static_cast<const Base&>(*this);
         }
 
-        /*implicit*/ operator const Base&&() const && {
+        /*implicit*/ operator const Base&&() const&& {
             return static_cast<const Base&&>(*this);
         }
     };
-    
+
+    struct EmptyStruct {};
+
     template <bool Cond, typename T>
-    struct OrEmpty {
-    };
+    struct OrEmpty {};
 
     template <typename T>
-    struct OrEmpty<true, T> : T {
+    struct OrEmpty<true, T> : T {};
+
+    template <typename ElementT>
+    union impl_dest_u_vec {
+        std::vector<ElementT> v;
+        EmptyStruct e;
+
+        constexpr impl_dest_u_vec() noexcept : v{} {
+        }
+
+        explicit constexpr impl_dest_u_vec(std::vector<ElementT>&& v) noexcept : v(std::move(v)) {
+        }
+
+        explicit constexpr impl_dest_u_vec(std::vector<ElementT>& v) noexcept : v(v) {
+        }
+
+        /*implicit*/ constexpr operator std::vector<ElementT>&() & noexcept {
+            return v;
+        }
+
+        /*implicit*/ constexpr operator const std::vector<ElementT>&() const& noexcept {
+            return v;
+        }
+
+        /*implicit*/ constexpr operator std::vector<ElementT>&&() && noexcept {
+            return std::move(v);
+        }
+
+        constexpr ~impl_dest_u_vec() noexcept {
+        }
+        
+        void clear() {
+            v = {};
+        }
+
+        constexpr impl_dest_u_vec& operator=(impl_dest_u_vec&& other) noexcept {
+            if (this != &other) {
+                std::construct_at(&v, std::move(other.v));
+            }
+            return *this;
+        }
     };
 } // namespace cstd
