@@ -9,8 +9,8 @@ export module nodes;
 import cp_consts;
 import parser_utils;
 import array_parsers;
-import parser_b2;
-import parser_b1;
+import parser_base;
+import parser_mxns;
 import simple_cstd;
 import parser_utils;
 import gstd;
@@ -43,6 +43,7 @@ export namespace nodes {
 
         namespace def {
             using namespace parser;
+            using namespace mxns;
             using namespace common;
             using namespace cp_consts::traits;
 
@@ -60,8 +61,8 @@ export namespace nodes {
                 using Base = std::variant<cp_var, RawAnyJaacSpan<>>;
 
             public:
-                /*implicit*/ constexpr CpoolAndRawVar(cp_var var) noexcept : Base(var) {}
-                /*implicit*/ constexpr CpoolAndRawVar(RawAnyJaacSpan<> span) noexcept : Base(span) {}
+                IMPLICIT constexpr CpoolAndRawVar(cp_var var) noexcept : Base(var) {}
+                IMPLICIT constexpr CpoolAndRawVar(RawAnyJaacSpan<> span) noexcept : Base(span) {}
 
                 template <typename SpecW>
                 gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) noexcept {
@@ -78,8 +79,8 @@ export namespace nodes {
 
     namespace full {
         template <templ::ParseFlags parseFlags>
-        struct EmptyClassN : templ::ClearClassN<parseFlags> {
-            parser::common::Translator cpool, ifaces, fields, methods, attrs;
+        struct EmptyClassN : templ::ClearClassN<parseFlags> { // NOLINT(*-pro-type-member-init)
+            parser::mxns::Translator cpool, ifaces, fields, methods, attrs;
         };
     } // namespace full
 } // namespace nodes

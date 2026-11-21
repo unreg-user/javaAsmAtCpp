@@ -1,22 +1,25 @@
 module;
 
 #include <cstdint>
+#include <optional>
 #include <utility>
+#include "../../../cstd/macro.h"
 
 export module code_attr;
 
-import parser_b1;
-import parser_b2;
-import parser_wrappers_b2;
+import parser_mxns;
+import parser_base;
+import parser_widstructs;
 import parser_utils;
 import gstd;
 
 export namespace parser::mcode {
     using CodeDeclSizeT = wrappers::NumToNum<uint32_t, uint16_t>;
     using CodeSizeT = wrappers::Number<uint16_t>;
+    using ExceptionsSizeT = CodeSizeT;
     using MethodMaxT = wrappers::Number<uint16_t>;
 
-    struct Maxs : common::SerCombinatorPMxn<Maxs, MethodMaxT, MethodMaxT> {
+    struct Maxs : mxns::SerCombinatorPMxn<Maxs, MethodMaxT, MethodMaxT> {
         MethodMaxT maxStack{};
         MethodMaxT maxLocals{};
 
@@ -34,7 +37,7 @@ export namespace parser::mcode {
         }
     };
 
-    struct Exception : common::SerCombinatorPMxn<Maxs, CodeSizeT, CodeSizeT, CodeSizeT, wrappers::CpoolSizeT> {
+    struct Exception : mxns::SerCombinatorPMxn<Maxs, CodeSizeT, CodeSizeT, CodeSizeT, wrappers::CpoolSizeT> {
         CodeSizeT beginIdx{}, endIdx{}, handlerIdx{};
         wrappers::CpoolSizeT typeIdx{};
 
@@ -57,19 +60,21 @@ export namespace parser::mcode {
 
     using RawException = wrappers::FlatNumber<uint64_t>;
 
+    // ReSharper disable CppRedundantTemplateArguments
     template <typename CodeCont /*elem complex, size_t ~ CodeDeclSizeT*/,
-              typename ExceptionsCont /*elem ~ Exception, size_t ~ CodeSizeT*/, typename AttrsCont>
+              typename ExceptionsCont /*elem ~ Exception, size_t ~ ExceptionsSizeT*/ = common::RawJaacSpan<RawException, ExceptionsSizeT>, typename AttrsCont /*Standard*/ = common::DefAttrsCont>
     struct CodeAttribute : Maxs,
-                           common::SerCombinatorPMxn<CodeAttribute<CodeCont, ExceptionsCont, AttrsCont>, Maxs, CodeCont,
+                           mxns::SerCombinatorPMxn<CodeAttribute<CodeCont, ExceptionsCont, AttrsCont>, Maxs, CodeCont,
                                                      ExceptionsCont, AttrsCont> {
+    // ReSharper enable CppRedundantTemplateArguments
+
         CodeCont code{};
         ExceptionsCont exceptions{};
         AttrsCont attrs{};
 
         constexpr CodeAttribute() noexcept = default;
 
-        constexpr CodeAttribute(Maxs&& maxs, CodeCont&& code, ExceptionsCont&& exceptions,
-                                AttrsCont&& attrs) noexcept :
+        constexpr CodeAttribute(const Maxs maxs, CodeCont&& code, ExceptionsCont&& exceptions, AttrsCont&& attrs) noexcept :
             Maxs(maxs), code(std::move(code)), exceptions(std::move(exceptions)), attrs(std::move(attrs)) {
         }
 
@@ -80,6 +85,13 @@ export namespace parser::mcode {
             exceptions.deser(writePtr);
             attrs.deser(writePtr);
             return {};
+        }
+    };
+
+    template <typename >
+    struct DefCodeCont {
+        NODISCARD constexpr std::optional<DefCodeCont> complex_parse() noexcept {
+            return std::nullopt;
         }
     };
 } // namespace parser::mcode

@@ -1,7 +1,6 @@
 module;
 
-#include <expected>
-
+#include <concepts>
 #include "parser_mcr.h"
 
 export module array_parsers;
@@ -9,11 +8,12 @@ export module array_parsers;
 import opcodes;
 import parser_utils;
 import cp_consts;
-import read_utils;
 import parser_concepts;
-import parser_wrappers_b2;
-import parser_b2;
+import parser_widstructs;
+import parser_base;
 import simple_cstd;
+import gstd;
+import macro_u;
 
 export namespace parser {
     template <typename T, bool skip0 = false>
@@ -42,42 +42,46 @@ export namespace parser {
         }
     }
 
-    template <typename OutCowr, HandleMode handleMode, typename ArrayRSizeT = wrappers::ArraySizeT, bool hasParseSize = false, typename SpecR, typename SpecW,
-              bool skip0 = hasParseSize, typename ArrDirT>
-    void deser_array(WritePtrBySpec<SpecW>& writePtr, ArrDirT&& jaacArray, auto&& deserializer1) noexcept {
+    template <typename OutCowr, HandleMode handleMode, typename ArrSizeT = wrappers::ArraySizeT,
+              bool hasParseSize = false, typename SpecW, bool skip0 = hasParseSize, typename ArrDirT,
+              typename Deserializer>
+        requires(requires(Deserializer& dsr) {
+            { dsr() } -> gstd::bool_or_true;
+        })
+    bool deser_array(WritePtrBySpec<SpecW>& writePtr, ArrDirT&& jaacArray, Deserializer&& deserializer1) noexcept {
         using ArrT = std::remove_cvref_t<ArrDirT>;
 
         DEF_BOOL_FLAG_AT_GEN(isJaacArrRawDeserable, false, decltype(jaacArray));
         static_assert(!isJaacArrRawDeserableFlag || JaacDeserable<ArrT, SpecW>,
-                      "Invalid raw deserializable jaac array type (with flag rawDeserable = true). Expected requires "
-                      "JaacDeserable<TYPE, SPEC_W> (from asm.parser_utils)");
+                      "Invalid raw deserializable jaac array type (with flag rawDeserable = true). Expected requires JaacDeserable<TYPE, SPEC_W> (from asm.parser_utils)");
 
         if constexpr (isJaacArrRawDeserableFlag) {
-            jaacArray.deser();
+            return jaacArray.deser();
         } else {
             static_assert(handleMode == HandleMode::NONE || JaacIterable<ArrT, OutCowr>,
                           "Bad jaac array (not jaac iterable)");
             static_assert(handleMode == HandleMode::FULL || JaacTranslator<ArrT>);
 
+            // true void
             if constexpr (handleMode == HandleMode::FULL) {
-                ArrayRSizeT{get_array_deser_size<hasParseSize>(jaacArray)}.deser(writePtr);
+                ArrSizeT{get_array_deser_size<hasParseSize>(jaacArray)}.deser(writePtr);
             } else if constexpr (handleMode == HandleMode::APPEND) {
-                ArrayRSizeT{
-                    jaacArray.jaac_get_source_data_size() +
-                            get_array_deser_size<hasParseSize>(jaacArray)
-                }.deser(writePtr);
+                ArrSizeT{jaacArray.jaac_get_source_data_size() + get_array_deser_size<hasParseSize>(jaacArray)}.deser(
+                        writePtr);
             } else {
-                ArrayRSizeT{jaacArray.jaac_get_source_data_size()}.deser(writePtr);
+                ArrSizeT{jaacArray.jaac_get_source_data_size()}.deser(writePtr);
             }
             if constexpr (handleMode != HandleMode::FULL) {
-                writePtr.deser_range(UncheckedReadPtr{jaacArray.jaac_get_source_data_interval_begin(), jaacArray.jaac_get_source_data_interval_end()});
+                writePtr.deser_range(UncheckedReadPtr{jaacArray.jaac_get_source_data_interval_begin(),
+                                                      jaacArray.jaac_get_source_data_interval_end()});
             }
 
             if constexpr (handleMode != HandleMode::NONE) {
                 for (auto& i : JaacIterator<ArrT, skip0>{jaacArray}) {
-                    deserializer1(i);
+                    if (deserializer1(i)) [[unlikely]] return false;
                 }
             }
+            return true;
         }
     }
 
@@ -95,12 +99,6 @@ export namespace parser {
         return readPtr2;
     }
 
-    template <bool handle = false, typename SpecR>
-    ParseErr parse1_const(ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept {
-        return parse1_const_big_ctx<handle>(
-                readPtr, [&](opcodes::TagIdEnum, cp_consts::traits::cp_var result) { handler(result); }, [] {});
-    }
-
     template <bool shouldHasCorrectCollection, typename ElemT, typename SpecR>
     bool parse_simple_collection(ReadPtrBySpec<SpecR>& readPtr, auto&& array, const wrappers::ArraySizeT mf_size) {
         for (ArrayRSizeT i = 0; i < static_cast<ArrayRSizeT>(mf_size); ++i) {
@@ -109,9 +107,9 @@ export namespace parser {
                 if (!opt_elem) [[unlikely]] {
                     return false;
                 }
-                DEF_ASSERT_FALSE(array.jaac_emplace_back(std::move(*opt_elem)));
+                ul_assert_false(array.jaac_emplace_back(std::move(*opt_elem)));
             } else {
-                DEF_ASSERT_FALSE(ElemT::check_and_move(readPtr));
+                ul_assert_false(ElemT::check_and_move(readPtr));
             }
         }
         return true;

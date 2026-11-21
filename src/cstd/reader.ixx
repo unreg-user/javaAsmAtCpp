@@ -14,19 +14,20 @@ import simple_cstd;
 import gstd;
 
 export namespace reader {
-    NODISCARD F_INLINE FILE* open_file(const std::filesystem::path& path, const std::string_view mode) noexcept {
+    NODISCARD F_INLINE FILE* open_file(const std::filesystem::path& path, const char* rawMode) noexcept {
 #ifdef _WIN32
+        std::string_view mode = rawMode;
         const std::wstring w_mode(mode.begin(), mode.end());
         return _wfopen(path.c_str(), w_mode.c_str());
 #else
-        return std::fopen(path.c_str(), mode.data());
+        return std::fopen(path.c_str(), rawMode);
 #endif
     }
 
     namespace mixins {
         struct FileDataPMxn {
             void unchecked_close(this auto&& self) noexcept {
-                free(self.data);
+                free(std::forward_like<decltype(self)>(self).data);
             }
         };
     } // namespace mixins
@@ -54,11 +55,11 @@ export namespace reader {
 
         constexpr FileDataWithSize() noexcept = default;
 
-        /*implicit*/ operator FileData<Sym>() const noexcept {
+        IMPLICIT operator FileData<Sym>() const noexcept {
             return FileData<Sym>{data};
         }
 
-        /*implicit*/ operator std::span<Sym>() const noexcept {
+        IMPLICIT operator std::span<Sym>() const noexcept {
             assert(rawSize % sizeof(Sym) == 0);
             return {data, rawSize / sizeof(Sym)};
         }
@@ -156,11 +157,11 @@ export namespace reader {
     };
 
     struct ReadPtrDefaultFlagsStruct {
-        CSFLAG CheckMemorySize = true;
+        COM_BOOL checkMemorySize = true;
     };
 
     struct UncheckedReadPtrFlagsStruct {
-        CSFLAG CheckMemorySize = false;
+        COM_BOOL checkMemorySize = false;
     };
 
     template <typename Sym, typename FlagsStruct = ReadPtrDefaultFlagsStruct>
@@ -168,7 +169,7 @@ export namespace reader {
         Sym* i;
         Sym* endPtr;
 
-        /*implicit*/ ReadPtr(std::span<Sym> data) noexcept : i(data.data()), endPtr(data.data() + data.size()) {
+        IMPLICIT ReadPtr(std::span<Sym> data) noexcept : i(data.data()), endPtr(data.data() + data.size()) {
         }
 
         ReadPtr(Sym* i, Sym* end) noexcept : i(i), endPtr(end) {
@@ -180,110 +181,126 @@ export namespace reader {
         ReadPtr(ReadPtr&& other) noexcept : i(other.i), endPtr(other.endPtr) {
         }
 
-        FAKE_TEMPL requires (!FlagsStruct::CheckMemorySize)
+        FAKE_TEMPL requires (!FlagsStruct::checkMemorySize)
         explicit ReadPtr(Sym* i) noexcept : i(i), endPtr(nullptr) {
         }
 
-        ReadPtr cpyWithSizeSymbols(const size_t size) {
-            if constexpr (FlagsStruct::CheckMemorySize)
-                assert(i + size < endPtr);
+        FAKE_TEMPL requires (!FlagsStruct::checkMemorySize)
+        explicit ReadPtr() noexcept : i(nullptr), endPtr(nullptr) {
+        }
+
+        ReadPtr cpyWithSizeSymbols(const size_t size) const {
+            if constexpr (FlagsStruct::checkMemorySize)
+                assert(i + size <= endPtr);
             return {i, i + size};
         }
 
-        ReadPtr cpyWithSize(const size_t bytes) {
+        ReadPtr cpyWithSize(const size_t bytes) const {
             assert(bytes % sizeof(Sym) == 0);
             return cpyWithSizeSymbols(bytes / sizeof(Sym));
         }
 
-        auto readSpan() {
-            assert(i <= endPtr);
-            auto span = std::span<Sym>{i, static_cast<size_t>(endPtr - i)};
-            i = endPtr;
+        auto readSpan(this auto&& self) {
+            assert(self.i <= self.endPtr);
+            auto span = std::span<Sym>{self.i, static_cast<size_t>(self.endPtr - self.i)};
+            if constexpr (!std::is_rvalue_reference_v<decltype(self)>) {
+                self.i = self.endPtr;
+            }
             return span;
         }
 
         template <typename Type>
-        NODISCARD F_INLINE bool memcpy(Type& to) noexcept {
+        NODISCARD F_INLINE bool memcpy(this auto&& self, Type& to) noexcept {
             static_assert(sizeof(Type) % sizeof(Sym) == 0, "cannot containing in symbols");
             static constexpr auto typeS = sizeof(Type) / sizeof(Sym);
 
-            if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + typeS <= endPtr)) [[unlikely]] {
+            if constexpr (FlagsStruct::checkMemorySize) {
+                if (!(self.i + typeS <= self.endPtr)) [[unlikely]] {
                     return false;
                 }
             }
 
-            std::memcpy(&to, i, sizeof(Type));
-            i += typeS;
+            std::memcpy(&to, self.i, sizeof(Type));
+            if constexpr (!std::is_rvalue_reference_v<decltype(self)>) {
+                self.i += typeS;
+            }
             return true;
         }
 
-        template <typename Type, typename Callable>
-        NODISCARD F_INLINE std::optional<Type> parse_via_func(Callable&& callable) noexcept {
-            Type to;
-            const bool cpyResult = memcpy(to);
+        template <typename Type, typename DirCallable>
+        NODISCARD F_INLINE std::optional<Type> parse_via_func(this auto&& self, DirCallable&& callable) noexcept {
+            using Callable = std::remove_cvref_t<DirCallable>;
 
-            if constexpr (FlagsStruct::CheckMemorySize) {
+            Type to;
+            const bool cpyResult = std::forward_like<decltype(self)>(self).memcpy(to);
+
+            if constexpr (FlagsStruct::checkMemorySize) {
                 if (!cpyResult) [[unlikely]] {
                     return std::nullopt;
                 }
             }
 
-            if constexpr (std::same_as<Callable, cstd::identify_lambda_t>) {
+            if constexpr (std::same_as<Callable, decltype(cstd::identifyLam)>) {
                 return std::optional{std::move(to)};
             } else {
-                return std::optional{callable(std::move(to))};
+                return std::optional{std::forward<DirCallable>(callable)(std::move(to))};
             }
         }
 
         template <typename Type>
-        NODISCARD F_INLINE std::optional<Type> parse() noexcept {
-            return parse_via_func<Type>(cstd::identify_lambda);
+        NODISCARD F_INLINE std::optional<Type> parse(this auto&& self) noexcept {
+            return std::forward_like<decltype(self)>(self).template parse_via_func<Type>(cstd::identifyLam);
         }
 
         template <typename Type>
-        NODISCARD F_INLINE std::optional<Type> parse_rev() noexcept {
-            return parse_via_func<Type>(cstd::byteswap_v_func);
+        NODISCARD F_INLINE std::optional<Type> parse_rev(this auto&& self) noexcept {
+            return std::forward_like<decltype(self)>(self).template parse_via_func<Type>(cstd::byteswapLam);
         }
 
-        NODISCARD F_INLINE bool check_and_move_symbols(size_t symbols) noexcept {
-            if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + symbols <= endPtr)) [[unlikely]] {
+        NODISCARD F_INLINE bool check_and_move_symbols(this auto&& self, size_t symbols) noexcept {
+            if constexpr (FlagsStruct::checkMemorySize) {
+                if (!(self.i + symbols <= self.endPtr)) [[unlikely]] {
                     return false;
                 }
             }
 
-            i += symbols;
+            if constexpr (!std::is_rvalue_reference_v<decltype(self)>) {
+                self.i += symbols;
+            }
+
             return true;
         }
 
-        NODISCARD F_INLINE bool check_and_move(const size_t bytes) noexcept {
+        NODISCARD F_INLINE bool check_and_move(this auto&& self, const size_t bytes) noexcept {
             assert(bytes % sizeof(Sym) == 0);
-            return check_and_move_symbols(bytes / sizeof(Sym));
+            return std::forward_like<decltype(self)>(self).check_and_move_symbols(bytes / sizeof(Sym));
         }
 
         template <size_t symbols>
-        NODISCARD F_INLINE bool check_and_move_symbols() noexcept {
-            if constexpr (FlagsStruct::CheckMemorySize) {
-                if (!(i + symbols <= endPtr)) [[unlikely]] {
+        NODISCARD F_INLINE bool check_and_move_symbols(this auto&& self) noexcept {
+            if constexpr (FlagsStruct::checkMemorySize) {
+                if (!(self.i + symbols <= self.endPtr)) [[unlikely]] {
                     return false;
                 }
             }
 
-            i += symbols;
+            if constexpr (!std::is_rvalue_reference_v<decltype(self)>) {
+                self.i += symbols;
+            }
+
             return true;
         }
 
         template <size_t bytes>
-        NODISCARD F_INLINE bool check_and_move() noexcept {
+        NODISCARD F_INLINE bool check_and_move(this auto&& self) noexcept {
             static_assert(bytes % sizeof(Sym) == 0, "cannot contain in symbols");
-            return check_and_move_symbols<bytes / sizeof(Sym)>();
+            return std::forward_like<decltype(self)>(self).template check_and_move_symbols<bytes / sizeof(Sym)>();
         }
 
         template <typename Type>
-        NODISCARD F_INLINE bool check_and_move() noexcept {
+        NODISCARD F_INLINE bool check_and_move(this auto&& self) noexcept {
             static_assert(sizeof(Type) % sizeof(Sym) == 0, "cannot contain in symbols");
-            return check_and_move<sizeof(Type) / sizeof(Sym)>();
+            return std::forward_like<decltype(self)>(self).template check_and_move<sizeof(Type)>();
         }
 
         Sym* begin() const noexcept {
@@ -304,7 +321,7 @@ export namespace reader {
             return endPtr;
         }
 
-        /*implicit*/ operator std::span<Sym>() const noexcept {
+        IMPLICIT operator std::span<Sym>() const noexcept {
             ReadPtr copy = *this;
             return copy.readSpan();
         }
@@ -343,13 +360,13 @@ export namespace reader {
 
         template <typename Type>
         F_INLINE gstd::true_void deser(Type&& from) noexcept {
-            deser_via_func(from, cstd::identify_lambda);
+            deser_via_func(from, cstd::identifyLam);
             return {};
         }
 
         template <typename Type>
         F_INLINE gstd::true_void deser_rev(Type&& from) noexcept {
-            deser_via_func(from, cstd::byteswap_v_func);
+            deser_via_func(from, cstd::byteswapLam);
             return {};
         }
     };

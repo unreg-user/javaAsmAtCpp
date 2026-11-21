@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <span>
+#include "../../cstd/macro.h"
 
 export module parser_utils;
 
@@ -16,11 +17,25 @@ export namespace parser {
 
     using UncheckedReadPtr = ReadPtrBySpec<reader::UncheckedReadPtrFlagsStruct>;
 
-    enum class ParseErr : uint8_t { NONE, UNOPEN, INVALID, POST_PARSE_ERR };
+    struct ParseErr {
+        enum class At : uint8_t { NONE, MAGIC, VERSION, CPOOL, POST_CPOOL, IFACES, FIELDS, METHODS, ATTRS, POST_PARSE };
 
-    enum class DeserErr : uint8_t { NONE, UNOPEN };
+        At at;
+
+        GEN_DEF_EQ_OP(ParseErr);
+    };
+
+    struct DeserErr {
+        enum class At : uint8_t { NONE, CPOOL, IFACES, FIELDS, METHODS, ATTRS };
+
+        At at;
+
+        GEN_DEF_EQ_OP(DeserErr);
+    };
 
     enum class HandleMode : uint8_t { NONE, APPEND, FULL };
+
+    enum class ParseJaacComplexCollMode : uint8_t { FULL_SKIP, SKIP_AND_SAVE_INTERVALS, PARSE };
 
     enum class ParseLength : uint8_t { VERSION = 0, CPOOL = 1, IFACES = 2, FIELDS = 3, METHODS = 4, FULL = 5 };
 

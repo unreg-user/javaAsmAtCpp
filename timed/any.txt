@@ -1597,3 +1597,699 @@ using deref_to_ref_variant =
     FileDataWithSize<Sym> convertToFileDataWS(std::vector<Sym>& vec) noexcept {
         return FileDataWithSize<Sym>{vec.data(), vec.size()};
     }
+
+
+
+            // open file
+            const auto wDataOpt = preRWData.open("wb");
+            if (!wDataOpt)
+                return retValLambda(DeserErr::UNOPEN);
+            auto wData = *wDataOpt;
+
+
+
+            // close file
+            wData.raw_write_file(reader::convertToFileDataWS(outData));
+            wData.close();
+// #define DEF_OR_ELSE_OPT_INVALID(type, name, at) OR_ELSE_OPT(type, name, type::parse(readPtr), return ParseErr{ParseErr::At::at};)
+// #define DEF_ASSERT_INVALID(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return ParseErr::INVALID; }
+
+
+
+#define DEF_ARRAY_PREWRITE_CALL(at, uName, path) \
+            if constexpr (handleMode##uName##Flag != HandleMode::NONE && requires { { classNode.path.jaac_prewrite_handle(classNode) } -> gstd::bool_or_true; }) { \
+                DEF_ASSERT_UNEX(at, classNode.path.jaac_prewrite_handle(classNode)); \
+            }
+                DEF_ARRAY_PREWRITE_CALL(Cpool, cpool)
+                if constexpr (containsIFACES_Parsing) {
+                    DEF_ARRAY_PREWRITE_CALL(Ifaces, ifaces)
+                    if constexpr (containsFIELDS_Parsing) {
+                        DEF_ARRAY_PREWRITE_CALL(Fields, fields)
+                        if constexpr (containsMETHODS_Parsing) {
+                            DEF_ARRAY_PREWRITE_CALL(Methods, methods)
+                            if constexpr (containsFULL_Parsing) {
+                                DEF_ARRAY_PREWRITE_CALL(Attrs, attrs)
+                            }
+                        }
+                    }
+                }
+
+    template <typename ClassNT, typename SpecR = cflags::class_file_ptr, typename SpecW = cflags::class_file_ptr,
+              bool useFlush = true, bool checkMagic = true, bool g1>
+    ParseRetType<ClassNT> parse(const reader::PreRWFileData<g1> preRWData) noexcept {
+        const auto rDataOpt = preRWData.open("rb");
+
+        if (!rDataOpt)
+            return std::unexpected{ParseErr::UNOPEN};
+
+        const reader::RWFileData rData = *rDataOpt;
+
+        if constexpr (useFlush) {
+            DISCARD rData.flush();
+        }
+
+        const auto readData = rData.read_file<uint8_t, true, true>();
+        DISCARD rData.close();
+
+        auto ret = parse1<ClassNT, SpecR, SpecW, checkMagic, g1>(preRWData, readData);
+        readData.unchecked_close();
+
+        return ret;
+    }
+#define OR_ELSE_OPT_UNEX_DECLARED(type, name, opt_value, unex) OR_ELSE_OPT_DECLARED(type, name, opt_value, return std::unexpected{unex};)
+#define OR_ELSE_OPT_UNEX(type, name, opt_value, unex) OR_ELSE_OPT(type, name, opt_value, return std::unexpected{unex};)
+
+
+    template <bool handle = false, typename SpecR>
+    ParseErr parse1_const(ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept {
+        return parse1_const_big_ctx<handle>(
+                readPtr, [&](opcodes::TagIdEnum, cp_consts::traits::cp_var result) { handler(result); }, [] {});
+    }
+
+
+
+    template <typename Base, typename ClassNT>
+    CPP_KOSTYL [[deprecated]] struct ClassNodeKnowsWMxn : Base {
+        ClassNT& classNode;
+
+        template <typename... Args> requires (sizeof...(Args) > 0)
+        /*implicit*/ constexpr ClassNodeKnowsWMxn(ClassNT& classNode, Args&&... args) noexcept : Base(args...), classNode(classNode) {}
+
+        explicit constexpr ClassNodeKnowsWMxn(ClassNT& classNode) noexcept : Base(), classNode(classNode) {}
+    };
+
+#if 0
+        template <typename... Args>
+            requires JaacDeepParsable<AttrsSpan, Args...> && (!JaacDeepParsable<AttrsSpan, wrappers::CpoolSizeT, Args...>)
+        bool deep_parse(Args&&... args) noexcept {
+            return static_cast<AttrsSpan>(*this).deep_parse(std::forward<Args>(args)...);
+        }
+
+        template <typename... Args>
+            requires JaacDeepParsable<AttrsSpan, wrappers::CpoolSizeT, Args...>
+        bool deep_parse(Args&&... args) noexcept {
+            return static_cast<AttrsSpan>(*this).deep_parse(attrNameIdx, std::forward<Args>(args)...);
+        }
+#endif
+
+
+        /*template <typename Element>
+        gstd::true_void jaac_push_back(this auto&& self, Element&& element) {
+            self.push_back(std::forward<Element>(element));
+            return {};
+        }*/
+        auto d = ClassN1{}.methods;
+        auto f = ReadPtrBySpec<cflags::class_file_ptr>{nullptr, nullptr};
+        parser::parse_MF<true, cflags::class_file_ptr, Methods&>(f, d, ArraySizeT{4});
+
+
+        variant_of_ptrs_and_little& operator=(const variant_of_ptrs_and_little& other) noexcept {
+            if (this != &other) {
+                varT::operator=(other);
+            }
+            return *this;
+        }
+
+        variant_of_ptrs_and_little& operator=(variant_of_ptrs_and_little&& other) noexcept {
+            if (this != &other) {
+                varT::operator=(other);
+            }
+            return *this;
+        }
+
+
+    // Cowrs
+    struct FieldInfoCowr {
+        template <typename T, typename AttrSpanCowr>
+        COWR_INST = requires(T t) {
+            requires cstd::is_implicit_convertable<decltype(t.accessFlags), wrappers::AccessFlags>;
+            requires cstd::is_implicit_convertable<decltype(t.nameIdx), wrappers::CpoolSizeT>;
+            requires cstd::is_implicit_convertable<decltype(t.descriptorIdx), wrappers::CpoolSizeT>;
+            requires AttrSpanCowr::COWR_USE<decltype(t.attrs)>;
+        };
+    };
+    /*
+    template <typename Self, typename T>
+    struct NumberStaticMethods {
+        template <typename SpecR>
+        F_INLINE static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            auto optT = readPtr.template parse_rev<T>();
+            if (!optT) [[unlikely]] return std::nullopt;
+            return std::optional{Self{*optT}};
+        }
+    };*/
+
+    /*
+    template <typename Base>
+    struct PtrSpanLPMxn {
+    };
+
+    template <typename T, size_t size = std::dynamic_extent>
+    struct ptr_span : std::span<T, size>, PtrSpanLPMxn<std::span<T, size>> {
+        using std::span<T, size>::span;
+    private:
+        using Base = std::span<T, size>;
+        using Base2 = PtrSpanLPMxn<Base>;
+    public:
+        using Base2::operator[];
+    };*/
+
+/*
+namespace std {
+    _EXPORT_STD extern "C++" __PURE_APPDOMAIN_GLOBAL _CRTDATA2_IMPORT ostream cerr;
+}*/
+
+
+
+#if 0
+    template <typename ElementType, typename Label = UnindexedLabel>
+    struct CListB : AbsCList<cstd::impl_dest_u_vec<typename BList<ElementType, Label>::Node*>, ElementType, Label> {
+        using VecElT = BList<ElementType, Label>::Node*;
+
+    protected:
+        using RawVecT = std::vector<VecElT>;
+        using VecT = cstd::impl_dest_u_vec<VecElT>;
+
+    private:
+        using Base = AbsCList<VecT, ElementType, Label>;
+
+    protected:
+        using Base::BListT;
+        using Base::cache;
+        using Base::dynamicSize;
+        using Base::first;
+        using Base::last;
+        size_t dynamicSize = 0;
+
+    public:
+        using Base::Base;
+        using typename Base::BaseNode;
+        using typename Base::Node;
+        using Base::operator=;
+
+        constexpr CListB() noexcept = default;
+
+        constexpr ~CListB() noexcept {
+            std::destroy_at(&cache.v);
+        }
+
+        constexpr explicit operator CList<ElementType, Label>() && {
+            auto result =
+                    CList<ElementType, Label>{first, last, dynamicSize, std::span<VecElT>{cache.begin(), dynamicSize}};
+            cache = {};
+            this->clear_fls();
+            return result;
+        }
+
+        constexpr void resize(size_t size) noexcept {
+            cache.v.resize(size);
+            first = getNodeAt(0);
+            last = getNodeAt(size - 1);
+        }
+
+        constexpr void push_back(ElementType&& element) noexcept {
+            auto vecRealSize = cache.v.size();
+            assert(dynamicSize < vecRealSize);
+
+            auto& currentNodeRef = cache.v[dynamicSize];
+            currentNodeRef = new Node{std::move(element)};
+            if (dynamicSize > 0) {
+                this->connect(cache.v[dynamicSize - 1], currentNodeRef);
+            } else {
+                first = currentNodeRef;
+            }
+
+            ++dynamicSize;
+            ++dynamicSize;
+
+            if (dynamicSize == vecRealSize) {
+                last = currentNodeRef;
+            }
+
+            currentNodeRef->mark_added();
+        }
+
+        constexpr auto getNodeAt(size_t i) noexcept {
+            return cache.v[i];
+        }
+
+    protected:
+        constexpr void clear_cache() noexcept {
+            cache.v.clear();
+        }
+
+        constexpr auto alloc_new_nodes_array() noexcept {
+            dynamicSize = dynamicSize;
+            RawVecT vec{};
+            vec.resize(dynamicSize);
+            return vec;
+        }
+
+        constexpr auto return_cache_by_array(RawVecT&& array) noexcept {
+            cache = VecT{std::move(array)};
+            return cache;
+        }
+    };
+#endif
+    /*
+    template <typename T, size_t size = std::dynamic_extent>
+    struct ptr_span {
+        using SpanT = std::span<T, size>;
+        SpanT span{};
+
+        T* operator[](this auto&& self, size_t i) noexcept {
+            return &(std::forward_like<decltype(self)>(self).span[i]);
+        }
+
+        WIDST_GEN_IMPLICIT_CC(SpanT, span, ptr_span);
+    };*/
+
+
+
+    template <typename ElementT>
+    union impl_dest_u_vec {
+        std::vector<ElementT> v;
+        EmptyStruct e;
+
+        constexpr impl_dest_u_vec() noexcept : v{} {
+        }
+
+        explicit constexpr impl_dest_u_vec(std::vector<ElementT>&& v) noexcept : v(std::move(v)) {
+        }
+
+        explicit constexpr impl_dest_u_vec(std::vector<ElementT>& v) noexcept : v(v) {
+        }
+
+        /*implicit*/ constexpr operator std::vector<ElementT>&() & noexcept {
+            return v;
+        }
+
+        /*implicit*/ constexpr operator const std::vector<ElementT>&() const& noexcept {
+            return v;
+        }
+
+        /*implicit*/ constexpr operator std::vector<ElementT>&&() && noexcept {
+            return std::move(v);
+        }
+
+        constexpr ~impl_dest_u_vec() noexcept {
+        }
+
+        void clear() {
+            v = {};
+        }
+
+        constexpr impl_dest_u_vec& operator=(impl_dest_u_vec&& other) noexcept {
+            if (this != &other) {
+                std::construct_at(&v, std::move(other.v));
+            }
+            return *this;
+        }
+    };
+
+                // const bool b1 = PostfieldsSt::check_and_move(readPtr);
+                // const bool b2 = Base::check_and_move(readPtr);
+                // const bool ret_val = /**/ b1 && b2;
+
+        NODISCARD F_INLINE static auto add_emp_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
+            if constexpr (emptyValueMode != EmptyValueMode::HASNT) {
+                return overload{emp_callable, callable};
+            } else {
+                return callable;
+            }
+        }
+
+        NODISCARD F_INLINE static auto add_emp_ignore_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
+            if constexpr (emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
+                return overload{emp_callable, callable};
+            } else {
+                return callable;
+            }
+        }
+
+
+
+        auto readPtr = ReadPtrBySpec<cflags::class_file_ptr>{nullptr, nullptr};
+        std::vector<uint8_t> musor;
+        auto writePtr = WritePtrBySpec<cflags::class_file_ptr>{musor};
+
+        auto d = PartialAttribute<cstd::variant_of_ptrs_and_little_t_ptr, FullAttribute<>>{}.deser(writePtr);
+
+
+
+
+#if 0
+                if constexpr (shouldHasCorrectCpool) {
+                    classNode.cpool.jaac_set_parse_size(cpool_size);
+
+                    if constexpr (parseCpoolStructureFlag) {
+                        DEF_ASSERT_UNEX(CPOOL, classNode.cpool.jaac_push_back(cp_consts::traits::cp_var{}));
+                    } else {
+                        DEF_ASSERT_UNEX(CPOOL, classNode.cpool.jaac_push_back(u8_span{}));
+                    }
+                }
+
+                for (ArrayRSizeT i = 1; i < static_cast<ArrayRSizeT>(cpool_size); ++i) {
+                    u8_ptr iOld = readPtr.i;
+                    bool is_unex = false;
+                    auto skipLDIdx = [&](const opcodes::TagIdEnum tagId) {
+                        if (tagId == opcodes::TagIdEnum::CONSTANT_Double ||
+                            tagId == opcodes::TagIdEnum::CONSTANT_Long) {
+                            if constexpr (shouldHasCorrectCpool) {
+                                if constexpr (parseCpoolStructureFlag) {
+                                    is_unex = is_unex || !classNode.cpool.jaac_push_back(cp_consts::traits::cp_var{});
+                                } else {
+                                    is_unex = is_unex || !classNode.cpool.jaac_push_back(u8_span{});
+                                }
+                            }
+                            i++;
+                        }
+                    };
+                    is_unex = is_unex || !cp_consts::parse1_const_big_ctx<parseCpoolStructureFlag>(
+                            readPtr,
+                            cstd::overload{[&](const opcodes::TagIdEnum tagId, cp_consts::traits::cp_var var) {
+                                               if constexpr (parseCpoolStructureFlag && hasCorrectCpool)
+                                                   is_unex = !classNode.cpool.jaac_push_back(var);
+                                               skipLDIdx(tagId);
+                                           },
+                                           [&](const opcodes::TagIdEnum tagId) {
+                                               if constexpr (!parseCpoolStructureFlag && hasCorrectCpool)
+                                                   is_unex = !classNode.cpool.jaac_push_back(
+                                                           static_cast<u8_span>(UncheckedReadPtr{iOld, readPtr.i}));
+                                               skipLDIdx(tagId);
+                                           }});
+                    DEF_ASSERT_UNEX(CPOOL, !is_unex)
+                }
+#endif
+
+
+
+    template <typename T2>
+    struct cast_lambda_t {
+        template <typename T1>
+        NODISCARD constexpr decltype(auto) operator()(T1&& value) const noexcept
+            requires larger_t_ptr<std::remove_cvref<T1>>
+        {
+            return static_cast<apply_exists_ref<decltype(value), T2>>(value);
+        }
+
+        template <typename T1>
+        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
+            requires(!larger_t_ptr<std::remove_cvref<T1>>)
+        {
+            return static_cast<T2>(value);
+        }
+    };
+
+    template <typename T2>
+    constexpr auto castLam = cast_lambda_t<T2>{};
+
+
+    template <typename T2>
+    constexpr auto extCastLam = ext_cast_lambda_t<T2>{};
+
+    template <typename T2>
+    struct ext_cast_lambda_t {
+        template <typename T1>
+        NODISCARD constexpr F_INLINE T2 operator()(T1&& value) const noexcept
+            requires larger_t_ptr<std::remove_cvref<T1>>
+        {
+            return T2{value};
+        }
+
+        template <typename T1>
+        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
+            requires(!larger_t_ptr<std::remove_cvref<T1>>)
+        {
+            return T2{value};
+        }
+    };
+
+
+
+    template <typename L>
+    struct [[deprecated]] emplacer : L {
+        using L::operator();
+
+        IMPLICIT operator decltype(auto)() {
+            return operator()();
+        }
+    };
+
+    constexpr auto same_as_l2args = []<typename T, typename Y>() constexpr { return std::same_as<T, Y>; };
+    template <typename T>
+    constexpr auto same_as_l1arg = []<typename Y>() constexpr { return std::same_as<T, Y>; };
+
+
+    constexpr auto destruct1_lambda = [](auto value) {
+        auto [v] = value;
+        return v;
+    };
+
+    template <typename T>
+    using destruct1_type = decltype(destruct1_lambda(std::declval<T>()));
+
+
+#if 0
+    template <typename, typename>
+    struct WidstructTraits {
+        constexpr static bool hasResult = false;
+    };
+
+    template <typename T>
+    struct WidstructTraits<struct_strict_widstruct<T>, T> {
+        constexpr static bool hasResult = true;
+        constexpr static bool strict = true;
+        constexpr static bool prim = false;
+        using WidenedT = T;
+    };
+
+    template <typename T>
+    struct WidstructTraits<struct_unstrict_widstruct<T>, T> {
+        constexpr static bool hasResult = true;
+        constexpr static bool strict = false;
+        constexpr static bool prim = false;
+        using WidenedT = T;
+    };
+
+    template <typename T>
+    struct WidstructTraits<prim_strict_widstruct<T>, T> {
+        constexpr static bool hasResult = true;
+        constexpr static bool strict = true;
+        constexpr static bool prim = true;
+        using WidenedT = T;
+    };
+
+    template <typename T>
+    struct WidstructTraits<prim_unstrict_widstruct<T>, T> {
+        constexpr static bool hasResult = true;
+        constexpr static bool strict = false;
+        constexpr static bool prim = true;
+        using WidenedT = T;
+    };
+
+    template <typename DirT, typename TB = GetWidstructDefBaser<std::remove_cvref_t<DirT>>::Result>
+    using MakeWidstructTraits = WidstructTraits<std::remove_cvref_t<DirT>, TB>;
+#endif
+
+
+            /*template <typename Ret, typename... = void>
+            using GetFirst = Ret;
+
+            template <typename Type>
+            struct TrivialCCFunc {
+                using Call = Type;
+            };
+
+            struct ErrCCFunc;*/
+
+            template <typename T1, typename T2, typename EmptyType = void>
+            struct Get1Of2 {
+                static_assert(true, "T1 and T2 not empty");
+            };
+
+            template <typename T2, typename EmptyType>
+            struct Get1Of2<EmptyType, T2, EmptyType> {
+                using Result = T2;
+            };
+
+            template <typename T1, typename EmptyType>
+            struct Get1Of2<T1, EmptyType, EmptyType> {
+                using Result = T1;
+            };
+
+
+            /*template <size_t from, size_t to, K1 ApplicatorByIter, typename... iterated>
+            struct SimpleTypeIterator : AbstractTypeIterator<from, to> {
+                using AbstractTypeIterator<to, from>::hasNext;
+
+                using Result = std::conditional_t<
+                    hasNext,
+                    typename SimpleTypeIterator<from + 1, to, ApplicatorByIter, iterated...,
+            ApplicatorByIter<SimpleTypeIterator>>::Result, TypesTraits<iterated...>
+                >;
+
+                using Result = TypesTraits<ApplicatorByIter<ApplicatorByIter<from:to>;
+            };
+
+            template <typename Return, typename Cache>
+            struct ConsequentialTypeIteratorPair {
+                GENERIC_ALIAS(Return);
+                GENERIC_ALIAS(Cache);
+            };
+
+            template <size_t from, size_t to, K1 ApplicatorByIter, typename LastIterCache, typename... iterated>
+            struct ConsequentialTypeIterator : AbstractTypeIterator<from, to> {
+            private:
+                using IterPair = ApplicatorByIter<ConsequentialTypeIterator>;
+                using AbstractSelf = AbstractTypeIterator<to, from>;
+
+            public:
+                using AbstractSelf::hasNext;
+                using AbstractSelf::fromV;
+                using AbstractSelf::toV;
+
+                using CacheT = LastIterCache;
+                using Result = std::conditional_t<
+                    hasNext,
+                    typename ConsequentialTypeIterator<from + 1, to, ApplicatorByIter, typename IterPair::CacheT,
+            iterated..., typename IterPair::ReturnT>::Result, TypesTraits<iterated...>
+                >;
+            };*/
+
+
+        /*namespace {
+            template <size_t nodeIndex>
+            struct ListByRoadedTMapBuilderCache {
+                V_GENERIC_FIELD(nodeIndex);
+            };
+        }*/
+
+        /*export {
+            template <size_t key, typename Value>
+            struct Node {
+                V_GENERIC_FIELD(key);
+                GENERIC_ALIAS(Value);
+            };
+
+            template <size_t size, typename... Nodes>
+            struct ListByRoadedTMapBuilder : TypesTraits<Nodes...> {
+            private:
+                template <typename Iterator>
+                static consteval auto build1M() {
+                    using LastCache = Iterator::CacheT;
+                    static constexpr size_t vaIndex = LastCache::fromV;
+                    static constexpr size_t nodeIndex = LastCache::nodeIndexV;
+                    using NodeVa = Nodes...[nodeIndex];
+                    static constexpr size_t nodeVaIndex = NodeVa::keyV;
+
+                    if constexpr (vaIndex < nodeVaIndex) {
+                        return ConsequentialTypeIteratorPair<void, LastCache>{};
+                    } else if constexpr (vaIndex == nodeVaIndex) {
+                        return ConsequentialTypeIteratorPair<typename NodeVa::ValueT,
+    ListByRoadedTMapBuilderCache<nodeIndex + 1>>{}; } else { static_assert(false, "Map is unroaded");
+                    }
+                }
+
+                template <typename Iterator>
+                using Build1 = decltype(build1M<Iterator>());
+
+            public:
+                using Build = ConsequentialTypeIterator<0, size, Build1, ListByRoadedTMapBuilderCache<0>>;
+            };
+
+            template <size_t size, typename... Nodes>
+            using MakeListByRoadedTMapBuilder = ListByRoadedTMapBuilder<Nodes...[sizeof...(Nodes)]::keyV, Nodes...>;
+        }
+    }*/
+
+        template <size_t from, size_t to>
+        struct AbstractTypeIterator {
+            V_GENERIC_FIELD(from);
+            V_GENERIC_FIELD(to);
+
+            static constexpr size_t hasNext = from < to;
+        };
+
+
+        template <typename Func, typename Ret, typename... Args>
+        concept CallableCon = requires(Func&& func, Args&&... args) {
+            { FORWARD(func)(FORWARD(args)...) } -> std::convertible_to<Ret>;
+        };
+
+        template <typename Func, typename Ret, typename... Args>
+        concept CallableConSRet = requires(Func&& func, Args&&... args) {
+            { FORWARD(func)(FORWARD(args)...) } -> std::same_as<Ret>;
+        };
+
+        template <typename Func, typename... Args>
+        concept CallableConARet = requires(Func&& func, Args&&... args) { FORWARD(func)(FORWARD(args)...); };
+
+        template <typename, typename = void>
+        struct CallableTraits;
+
+        template <typename Ret>
+        struct ReturnTraits {
+            GENERIC_ALIAS(Ret);
+
+            template <typename... Args>
+            using SignatureWith = Ret(Args...);
+        };
+
+        template <typename Ret, typename ArgsTraits>
+        struct UCallableTraits {
+            GENERIC_ALIAS(Ret);
+            GENERIC_ALIAS(ArgsTraits);
+
+            using Signature = ArgsTraits::template Wrap<ReturnTraits<Ret>::template SignatureWith>;
+        };
+
+        template <typename Ret, typename... Args>
+        struct CallableTraits<Ret(Args...)> : UCallableTraits<Ret, args::TypesTraits<Args...>> {};
+
+        template <typename Class, typename Ret, typename... Args>
+        struct CallableTraits<Ret (Class::*)(Args...)> : CallableTraits<Ret(Args...)> {};
+
+        template <typename Class, typename Ret, typename... Args>
+        struct CallableTraits<Ret (Class::*)(Args...) const> : CallableTraits<Ret(Args...)> {};
+
+        template <typename Class, typename Ret, typename... Args>
+        struct CallableTraits<Ret (Class::*)(Args...) noexcept> : CallableTraits<Ret(Args...)> {};
+
+        template <typename Class, typename Ret, typename... Args>
+        struct CallableTraits<Ret (Class::*)(Args...) const noexcept> : CallableTraits<Ret(Args...)> {};
+
+        template <typename Callable>
+        struct CallableTraits<Callable, std::void_t<decltype(&Callable::operator())>>
+            : CallableTraits<decltype(&Callable::operator())> {};
+
+        template <typename Callable>
+        using MakeCallableTraits = CallableTraits<std::remove_cvref_t<Callable>>;
+
+        template <typename Callable>
+        constexpr bool isCallable = requires { typename CallableTraits<Callable>; };
+
+
+    namespace call {
+        template <KN, typename>
+        struct RewrapFuncSignatureFromFuncClass;
+
+        template <KN Container, typename Ret, typename... Args>
+        struct RewrapFuncSignatureFromFuncClass<Container, std::_Func_class<Ret, Args...>> {
+            using Get = Container<Ret, Args...>;
+        };
+
+        template <KN Container, typename FuncSign>
+        using RewrapFuncSignature =
+                RewrapFuncSignatureFromFuncClass<Container, typename std::_Get_function_impl<FuncSign>::type>::Get;
+    } // namespace call
+
+
+        template <typename Value, Value... values>
+        struct ValuesTraits {
+            GENERIC_ALIAS(Value);
+            static constexpr Value valuesVs[] = {values...};
+
+            template <template <Value> typename Applicator, KN Wrapper>
+            using Apply = Wrapper<Applicator<values>...>;
+        };

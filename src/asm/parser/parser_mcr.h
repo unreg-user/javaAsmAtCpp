@@ -4,8 +4,40 @@
 #include "../../cstd/macro.h"
 // clang-format off
 
-#define OR_ELSE_OPT_UNEX(type, name, opt_value, unex) OR_ELSE_OPT(type, name, opt_value, return std::unexpected{unex};)
-#define OR_ELSE_OPT_UNEX_DECLARED(type, name, opt_value, unex) OR_ELSE_OPT_DECLARED(type, name, opt_value, return std::unexpected{unex};)
+#define USE_VOLATILE 0
+#define COMMON_ENUM_INNER(ENUM, at) ENUM{ENUM::At::at}
+#define UNEX_INNER(at) COMMON_ENUM_INNER(ParseErr, at)
+#define UNEX(at) std::unexpected{UNEX_INNER(at)}
+#define EX_INNER(at) COMMON_ENUM_INNER(DeserErr, at)
+
+#ifndef NDEBUG
+    #define DEF_ASSERT_UNEX(at, ...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return UNEX(at); )
+    #define DEF_ASSERT_EX(at, ...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] retL(EX_INNER(at)); )
+#else
+    #define DEF_ASSERT_UNEX(at, ...) DW0( if (MACRO_NEGATIVE_BOOL_CAST(__VA_ARGS__)) [[unlikely]] return UNEX(at); )
+    #define DEF_ASSERT_EX(at, ...) DW0( if (MACRO_NEGATIVE_BOOL_CAST(__VA_ARGS__)) [[unlikely]] return retL(EX_INNER(at)); )
+#endif
+
+#define ABS_PARSE(type, name, ...) DW0( auto timed = type::parse(readPtr); __VA_ARGS__; name = std::move(*timed); )
+#define ABS_UNWR_PARSE(type, name, ...) DW0( auto timed = type::parse(readPtr); __VA_ARGS__; name = gstd::unwrap(std::move(*timed)); )
+#define UNWR_OF(type) gstd::GetWidTypeOrVoid<type>
+
+#define PARSE_EXISTS_OR_RET_UNEX(type, name, at) ABS_PARSE(type, name, DEF_ASSERT_UNEX(at, timed))
+#define PARSE_EXISTS_OR_RET_FALSE(type, name) ABS_PARSE(type, name, ul_assert_false(timed))
+#define PARSE_EXISTS_OR_RET_NULLOPT(type, name) ABS_PARSE(type, name, ul_assert_nullopt(timed))
+
+#define PARSE_N_UNWRAP_EXISTS_OR_RET_UNEX(type, name, at) ABS_UNWR_PARSE(type, name, DEF_ASSERT_UNEX(at, timed))
+#define PARSE_N_UNWRAP_EXISTS_OR_RET_FALSE(type, name) ABS_UNWR_PARSE(type, name, ul_assert_false(timed))
+#define PARSE_N_UNWRAP_EXISTS_OR_RET_NULLOPT(type, name) ABS_UNWR_PARSE(type, name, ul_assert_nullopt(timed))
+
+#define PARSE_OR_RET_UNEX(type, name, at) type name; PARSE_EXISTS_OR_RET_UNEX(type, name, at)
+#define PARSE_OR_RET_FALSE(type, name) type name; PARSE_EXISTS_OR_RET_FALSE(type, name)
+#define PARSE_OR_RET_NULLOPT(type, name) type name; PARSE_EXISTS_OR_RET_NULLOPT(type, name)
+
+#define PARSE_N_UNWRAP_OR_RET_UNEX(type, name, at) UNWR_OF(type) name; PARSE_N_UNWRAP_EXISTS_OR_RET_UNEX(type, name, at)
+#define PARSE_N_UNWRAP_OR_RET_FALSE(type, name) UNWR_OF(type) name; PARSE_N_UNWRAP_EXISTS_OR_RET_FALSE(type, name)
+#define PARSE_N_UNWRAP_OR_RET_NULLOPT(type, name) UNWR_OF(type) name; PARSE_N_UNWRAP_EXISTS_OR_RET_NULLOPT(type, name)
+
 
 #define COM_BOOL COM bool
 
@@ -39,39 +71,41 @@
         static_assert(!SAC || (!shouldHasCorrect##uName || hasCorrect##uName), errTxt); \
         COM_BOOL hasCorrectTranslate##uName = REQ_REQ(JaacTranslator<decltype(classNode.path)>);
 
-#define OPT_ARRAY_HANDLE_INIT(name, uName, path, sizeT) \
-        DEF_OR_ELSE_OPT_UNEX(sizeT, name##_size); \
-        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_begin(readPtr.i); classNode.path.jaac_set_source_data_size(name##_size); }\
+#define OPT_ARRAY_HANDLE_INIT(at, name, uName, path, sizeT) \
+        PARSE_N_UNWRAP_OR_RET_UNEX(sizeT, name##Size, at); \
+        if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_begin(readPtr.i); classNode.path.jaac_set_source_data_size(static_cast<size_t>(name##Size)); }\
 
-#define DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path) OPT_ARRAY_HANDLE_INIT(name, uName, path, wrappers::ArraySizeT)
+#define DEF_OPT_ARRAY_HANDLE_INIT(at, name, uName, path) OPT_ARRAY_HANDLE_INIT(at, name, uName, path, wrappers::ArraySizeT)
 
 #define DEF_COM_ARRAY_HANDLE(SAC, uName, path, inElT) COM_ARRAY_HANDLE(SAC, uName, path, "Invalid "#path" field type (valid requires JaacCollection<., "#inElT"> (from asm.parser_concepts, if mode == FULL))", JaacCollection<decltype(classNode.path), inElT>)
 #define LENGTH_BOOL_GEN(S_NAME) COM_BOOL contains##S_NAME##_Parsing = parseLengthFlag >= ParseLength::S_NAME;
 
-#define DEF_MIDDLE_END_ARRAY_HANDLE_PART(name, uName, path, ...) \
+#define DEF_ARR_POSTCOMPLETE_HANDLE(at, path) \
+        if constexpr ( requires { { classNode.path.jaac_postcomplete_handle(classNode) } -> gstd::bool_or_true; } ) { \
+            DEF_ASSERT_UNEX(at, classNode.path.jaac_postcomplete_handle(classNode)); \
+        } \
+
+#define DEF_MANUAL_ARR_HANDLE(at, path) \
+    PARSE_EXISTS_OR_RET_UNEX(decltype(classNode.path), classNode.path, at); \
+    DEF_ARR_POSTCOMPLETE_HANDLE(at, path);
+
+#define DEF_MIDDLE_END_ARRAY_HANDLE_PART(at, name, uName, path, ...) \
         if constexpr (handleMode##uName##Flag != HandleMode::NONE) { \
-            classNode.path.jaac_reserve(static_cast<size_t>(name##_size)); \
-            if constexpr ( requires { classNode.path.jaac_start_handle(classNode); } ) classNode.path.jaac_start_handle(classNode); \
+            classNode.path.jaac_reserve(static_cast<size_t>(name##Size)); \
+            if constexpr ( requires { { classNode.path.jaac_start_handle(classNode) } -> gstd::bool_or_true; } ) DEF_ASSERT_UNEX(at, classNode.path.jaac_start_handle(classNode)); \
         } \
         __VA_ARGS__; \
-        if constexpr (handleMode##uName##Flag != HandleMode::NONE && requires { classNode.path.jaac_postcomplete_handle(classNode); }) { \
-            classNode.path.jaac_postcomplete_handle(classNode); \
-        } \
+        DEF_ARR_POSTCOMPLETE_HANDLE(at, path) \
         if constexpr (hasCorrectTranslate##uName) { classNode.path.jaac_set_source_data_interval_end(readPtr.i); }
 
-#define DEF_DESER(uName, path, iterCowr, hasParseSizeAndSkip0, sizeT, ...) deser_array<iterCowr, handleMode##uName##Flag, sizeT, hasParseSizeAndSkip0, SpecR, SpecW>(writePtr, classNode.path, __VA_ARGS__)
-#define DEF_JAAC_PRIM_DESER(uName, path, argT, sizeT) DEF_DESER(uName, path, cstd::ImplConvertableCowr<argT>, false, sizeT, [&writePtr] (argT value) { value.deser(writePtr); })
-#define DEF_JAAC_COMPLEX_DESER(uName, path, sizeT) DEF_DESER(uName, path, JaacDeserableCowr<SpecW>, false, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
-#define DEF_JAAC_COMPLEX_DESER_SKIP0(uName, path, sizeT) DEF_DESER(uName, path, JaacDeserableCowr<SpecW>, true, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
+#define DEF_DESER(at, uName, path, iterCowr, hasParseSizeAndSkip0, sizeT, ...) DEF_ASSERT_EX(at, deser_array<iterCowr, handleMode##uName##Flag, sizeT, hasParseSizeAndSkip0, SpecR, SpecW>(writePtr, classNode.path, __VA_ARGS__))
+#define DEF_JAAC_PRIM_DESER(at, uName, path, argT, sizeT) DEF_DESER(at, uName, path, cstd::ImplConvertableCowr<argT>, false, sizeT, [&writePtr] (argT value) { value.deser(writePtr); })
+#define DEF_JAAC_COMPLEX_DESER(at, uName, path, sizeT) DEF_DESER(at, uName, path, JaacDeserableCowr<SpecW>, false, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
+#define DEF_JAAC_COMPLEX_DESER_SKIP0(at, uName, path, sizeT) DEF_DESER(at, uName, path, JaacDeserableCowr<SpecW>, true, sizeT, [&writePtr] (auto& value) { value.deser(writePtr); })
 
-#define DEF_OPT_ARRAY_HANDLE(name, uName, path, ...) \
-        DEF_OPT_ARRAY_HANDLE_INIT(name, uName, path) \
-        DEF_MIDDLE_END_ARRAY_HANDLE_PART(name, uName, path, __VA_ARGS__)
-
-#define DEF_ARRAY_PREWRITE_CALL(uName, path) \
-            if constexpr (handleMode##uName##Flag != HandleMode::NONE && requires { classNode.path.jaac_prewrite_handle(classNode); }) { \
-                classNode.path.jaac_prewrite_handle(classNode); \
-            }
+#define DEF_OPT_ARRAY_HANDLE(at, name, uName, path, ...) \
+        DEF_OPT_ARRAY_HANDLE_INIT(at, name, uName, path) \
+        DEF_MIDDLE_END_ARRAY_HANDLE_PART(at, name, uName, path, __VA_ARGS__)
 
 #define FIELD_WRITER_INNER(name, path, Type, oldInst, timed_pre1) \
     using timed_t_1 = decltype(classNode.path); \
@@ -115,17 +149,7 @@
 #define DEF_CHECK_METHOD_EXISTS(name) CHECK_METHOD_EXISTS(classNode, name)
 #define DEF_CHECK_FIELD_EXISTS(name) CHECK_FIELD_EXISTS(classNode, name)
 
-#define DEF_ASSERT_UNEX(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
-#define DEF_ASSERT_INVALID(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return ParseErr::INVALID; }
-#define DEF_ASSERT_FALSE(...) { bool timed_bl_result = static_cast<bool>(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return false; }
-
-#define DEF_OR_ELSE_OPT_UNEX(type, name) OR_ELSE_OPT_UNEX(type, name, type::parse(readPtr), ParseErr::INVALID)
-#define DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name) { auto timed = type::parse(readPtr); if (!timed) [[unlikely]] { return std::unexpected{ParseErr::INVALID}; }; name = *timed; }
-#define DEF_OR_ELSE_OPT_INVALID(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return ParseErr::INVALID;)
-#define DEF_OR_ELSE_RET_FALSE(type, name) OR_ELSE_OPT(type, name, type::parse(readPtr), return false;)
-#define DEF_CHECK_MEMORY_OR_UNEX(bytes) { bool val = readPtr.check_and_move(bytes); assert(val); if (!val) [[unlikely]] return std::unexpected{ParseErr::INVALID}; }
-
 #define DEF_FIELD_WRITER(SAC, type, name) FIELD_WRITER(SAC, name, name, type, name)
-#define DEF_EXISTS_GET_AND_FIELD_WRITE(SAC, type, name) DEF_EXISTS_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(SAC, type, name);
-#define DEF_GET_AND_FIELD_WRITE(SAC, type, name) DEF_OR_ELSE_OPT_UNEX(type, name); DEF_FIELD_WRITER(SAC, type, name);
+#define DEF_EXISTS_GET_AND_FIELD_WRITE(at, SAC, type, name) PARSE_EXISTS_OR_RET_UNEX(type, name, at); DEF_FIELD_WRITER(SAC, type, name);
+#define DEF_GET_AND_FIELD_WRITE(SAC, at, type, name) PARSE_OR_RET_UNEX(type, name, at); DEF_FIELD_WRITER(SAC, type, name);
 #define DEF_FIELD_RETURNER(SAC, type, name) FIELD_RETURNER(SAC, name, name, type, name)

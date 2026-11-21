@@ -4,16 +4,13 @@ module;
 #include <bit>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <span>
 #include <type_traits>
-#include <variant>
-#include <xtr1common>
 
 #include "macro.h"
 
 export module simple_cstd;
-
-export struct Void {};
 
 export {
     using f32_t = float;
@@ -26,17 +23,53 @@ export namespace cstd {
         using Callables::operator()...;
     };
 
-    template <typename L>
-    struct [[deprecated]] emplacer : L {
-        using L::operator();
+    template <typename...>
+    concept dependent_false = false;
 
-        /*implicit*/ operator decltype(auto)() {
-            return operator()();
-        }
-    };
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_exists_ref = std::conditional_t<std::is_lvalue_reference_v<From>, To&, To&&>;
 
-    template <typename T1, typename T2>
-    using CopyRef = std::conditional_t<std::is_lvalue_reference_v<T1>, T2&, T2&&>;
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_ref = std::conditional_t<std::is_lvalue_reference_v<From>, To&,
+                                         std::conditional_t<std::is_rvalue_reference_v<From>, To&&, To>>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_const_nref = std::conditional_t<std::is_const_v<From>, const To, To>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_const = apply_const_nref<To, std::remove_reference_t<From>>;
+
+#if USE_VOLATILE
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_volatile_nref = std::conditional_t<std::is_volatile_v<From>, volatile To, To>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_volatile = apply_volatile_nref<To, std::remove_reference_t<From>>;
+#else
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_volatile_nref = To;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_volatile = To;
+#endif
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_cvref = apply_ref<apply_const<apply_volatile<To, From>, From>, From>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_cv_eref = apply_exists_ref<apply_const<apply_volatile<To, From>, From>, From>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using apply_cv_nref = apply_const_nref<apply_volatile_nref<To, From>, From>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using copy_cvref = apply_cvref<std::remove_cvref_t<To>, From>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using copy_cv_eref = apply_cv_eref<std::remove_cvref_t<To>, From>;
+
+    CPP_KOSTYL template <typename To, typename From>
+    using copy_cv_nref = apply_cv_nref<std::remove_cv_t<To>, From>;
 
     template <typename T, size_t than>
     concept larger_than = sizeof(T) > than;
@@ -58,108 +91,50 @@ export namespace cstd {
     template <typename T>
     using GetMinNumStrUType = std::conditional_t<std::same_as<T, uint8_t>, uint16_t, T>;
 
-    template <typename T>
-    struct [[deprecated]] raw_forward {
-        T& t;
-
-        /*implicit*/ constexpr raw_forward(T& t) noexcept : t(t) {
-        }
-
-        /*implicit*/ constexpr operator T&&() {
-            return std::move(t);
-        }
-    };
-
     template <typename T, typename Y>
-    struct pair_cast_mxn {
+    struct pair_cast_p_mxn {
         constexpr std::pair<T, Y> to_pair(this auto&& self) {
             return std::pair<T, Y>{self.first, self.second};
         }
 
-        /*implicit*/ constexpr operator std::pair<T, Y>(this auto&& self) noexcept {
+        IMPLICIT constexpr operator std::pair<T, Y>(this auto&& self) noexcept {
             return self.to_pair();
         }
     };
 
-    template <typename T2>
-    struct cast_lambda_t {
-        template <typename T1>
-        NODISCARD constexpr decltype(auto) operator()(T1&& value) const noexcept
-            requires larger_t_ptr<std::remove_cvref<T1>>
-        {
-            return static_cast<CopyRef<T1, T2>>(value);
-        }
+    template <typename T>
+    concept is_func_ptr = (std::is_pointer_v<T> && std::is_function_v<std::remove_pointer_t<T>>) ||
+                          std::is_member_function_pointer_v<T>;
 
+    constexpr struct {
         template <typename T1>
-        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
-            requires(!larger_t_ptr<std::remove_cvref<T1>>)
-        {
-            return static_cast<T2>(value);
-        }
-    };
-
-    template <typename T2>
-    struct ext_cast_lambda_t {
-        template <typename T1>
-        NODISCARD constexpr F_INLINE T2 operator()(T1&& value) const noexcept
-            requires larger_t_ptr<std::remove_cvref<T1>>
-        {
-            return T2{value};
-        }
-
-        template <typename T1>
-        NODISCARD constexpr F_INLINE T2 operator()(T1 value) const noexcept
-            requires(!larger_t_ptr<std::remove_cvref<T1>>)
-        {
-            return T2{value};
-        }
-    };
-
-    struct identify_lambda_t {
-        template <typename T1>
-        NODISCARD constexpr F_INLINE decltype(auto) operator()(T1&& value) const noexcept
+        NODISCARD F_INLINE constexpr decltype(auto) operator()(T1&& value) const noexcept
             requires larger_t_ptr<std::remove_cvref<T1>>
         {
             return value;
         }
 
         template <typename T1>
-        NODISCARD constexpr F_INLINE T1 operator()(T1 value) const noexcept
+        NODISCARD F_INLINE constexpr T1 operator()(T1 value) const noexcept
             requires(!larger_t_ptr<std::remove_cvref<T1>>)
         {
             return value;
         }
-    };
+    } identifyLam{};
 
-    constexpr auto same_as_l2args = []<typename T, typename Y>() constexpr { return std::same_as<T, Y>; };
-    template <typename T>
-    constexpr auto same_as_l1arg = []<typename Y>() constexpr { return std::same_as<T, Y>; };
-
-    constexpr auto destruct1_lambda = [](auto value) {
-        auto [v] = value;
-        return v;
-    };
-
-    template <typename T>
-    using destruct1_type = decltype(destruct1_lambda(std::declval<T>()));
-
-    template <typename T>
-    constexpr bool is_func_ptr = (std::is_pointer_v<T> && std::is_function_v<std::remove_pointer_t<T>>) ||
-                                 std::is_member_function_pointer_v<T>;
-
-    template <typename T2>
-    constexpr auto cast_lambda = cast_lambda_t<T2>{};
-    template <typename T2>
-    constexpr auto ext_cast_lambda = ext_cast_lambda_t<T2>{};
-    constexpr auto identify_lambda = identify_lambda_t{};
-    constexpr auto byteswap_v_func = []<typename T>(T value) -> T {
+    constexpr auto byteswapLam = []<typename T>(T value) -> T {
         if constexpr (requires { std::byteswap(value); }) {
             return std::byteswap(value);
         } else if constexpr (std::is_enum_v<T>) {
             return static_cast<T>(std::byteswap(static_cast<std::underlying_type_t<T>>(value)));
-        } else {
+        } /* else {
+            CPP_KOSTYL // where is used? I don't remember
             auto [value_field] = value;
             return T{std::byteswap(value_field)};
+        } */
+        else {
+            static_assert(false);
+            return {};
         }
     };
 
@@ -220,8 +195,8 @@ export namespace cstd {
 
     template <typename T2, typename T1>
     constexpr auto convert_to_span(T1& value) {
-        if (sizeof(T1) % sizeof(T2) != 0)
-            static_assert("cannot convert");
+        static_assert(sizeof(T1) % sizeof(T2) == 0);
+
         constexpr auto size = sizeof(T1) / sizeof(T2);
         using RetType = std::span<T2, size>;
 
@@ -231,8 +206,8 @@ export namespace cstd {
 
     template <typename T2, typename T1>
     constexpr auto convert_to_array(T1&& value) {
-        if (sizeof(T1) % sizeof(T2) != 0)
-            static_assert("cannot convert");
+        static_assert(sizeof(T1) % sizeof(T2) == 0);
+
         constexpr auto size = sizeof(T1) / sizeof(T2);
         using RetType = std::array<T2, size>;
 
@@ -294,74 +269,123 @@ export namespace cstd {
     struct NoneWMxn : Base {
         using Base::Base;
 
-        /*implicit*/ NoneWMxn(Base& base) : Base(base) {
+        IMPLICIT NoneWMxn(Base& base) : Base(base) {
         }
-        /*implicit*/ NoneWMxn(Base&& base) : Base(base) {
+        IMPLICIT NoneWMxn(Base&& base) : Base(base) {
         }
 
-        /*implicit*/ operator Base&() & {
+        IMPLICIT operator Base&() & {
             return static_cast<Base&>(*this);
         }
 
-        /*implicit*/ operator Base&&() && {
+        IMPLICIT operator Base&&() && {
             return static_cast<Base&&>(*this);
         }
 
-        /*implicit*/ operator const Base&() const& {
+        IMPLICIT operator const Base&() const& {
             return static_cast<const Base&>(*this);
         }
 
-        /*implicit*/ operator const Base&&() const&& {
+        IMPLICIT operator const Base&&() const&& {
             return static_cast<const Base&&>(*this);
         }
     };
 
     struct EmptyStruct {};
 
-    template <bool Cond, typename T>
+    template <bool /*Cond*/, typename /*T*/>
     struct OrEmpty {};
 
     template <typename T>
     struct OrEmpty<true, T> : T {};
 
-    template <typename ElementT>
-    union impl_dest_u_vec {
-        std::vector<ElementT> v;
-        EmptyStruct e;
+    template <typename T>
+    NODISCARD std::optional<T> opt_impl_construct(auto&& from) noexcept {
+        if (!from) [[unlikely]]
+            return std::nullopt;
+        return std::optional{T(std::forward_like<decltype(from)>(*from))};
+    }
 
-        constexpr impl_dest_u_vec() noexcept : v{} {
-        }
+    template <typename... IgnoredTs>
+    struct utils_with_ignore {
+        template <typename Callable>
+        struct deref_lam_t {
+        protected:
+            Callable callable;
 
-        explicit constexpr impl_dest_u_vec(std::vector<ElementT>&& v) noexcept : v(std::move(v)) {
-        }
-
-        explicit constexpr impl_dest_u_vec(std::vector<ElementT>& v) noexcept : v(v) {
-        }
-
-        /*implicit*/ constexpr operator std::vector<ElementT>&() & noexcept {
-            return v;
-        }
-
-        /*implicit*/ constexpr operator const std::vector<ElementT>&() const& noexcept {
-            return v;
-        }
-
-        /*implicit*/ constexpr operator std::vector<ElementT>&&() && noexcept {
-            return std::move(v);
-        }
-
-        constexpr ~impl_dest_u_vec() noexcept {
-        }
-        
-        void clear() {
-            v = {};
-        }
-
-        constexpr impl_dest_u_vec& operator=(impl_dest_u_vec&& other) noexcept {
-            if (this != &other) {
-                std::construct_at(&v, std::move(other.v));
+        public:
+            template <typename Func>
+                requires(!std::same_as<std::remove_cvref_t<Func>, deref_lam_t>) &&
+                        std::constructible_from<Callable, Func>
+            IMPLICIT constexpr deref_lam_t(Func&& func) noexcept(std::is_nothrow_constructible_v<Callable, Func>) :
+                callable(std::forward<Func>(func)) {
             }
-            return *this;
-        }
+
+            template <typename Ptr>
+                requires std::is_pointer_v<std::remove_cvref_t<Ptr>> &&
+                         (... && (!std::same_as<IgnoredTs,
+                                                std::remove_cv_t<std::remove_pointer_t<std::remove_cvref_t<Ptr>>>>) )
+            constexpr decltype(auto)
+            operator()(this auto&& self,
+                       Ptr&& slf) noexcept(noexcept(std::forward_like<decltype(self)>(self.callable)(*slf))) {
+                return std::forward_like<decltype(self)>(self.callable)(*slf);
+            }
+
+            template <typename T>
+                requires(!std::is_pointer_v<std::remove_cvref_t<T>>) &&
+                        (... && (!std::same_as<IgnoredTs, std::remove_cvref_t<T>>) )
+            constexpr decltype(auto) operator()(this auto&& self, T&& slf) noexcept(
+                    noexcept(std::forward_like<decltype(self)>(self.callable)(std::forward<T>(slf)))) {
+                return std::forward_like<decltype(self)>(self.callable)(std::forward<T>(slf));
+            }
+        };
+
+        template <typename Func>
+        deref_lam_t(Func&&) -> deref_lam_t<std::remove_cvref_t<Func>>;
+
+        template <typename FullType>
+        struct with_full_type {
+            template <typename Callable>
+            struct deref_lam_t : utils_with_ignore::deref_lam_t<Callable> {
+            private:
+                using Base = utils_with_ignore::deref_lam_t<Callable>;
+
+            public:
+                using Base::Base;
+                using Base::operator();
+
+                template <typename Ptr>
+                    requires std::is_pointer_v<std::remove_cvref_t<Ptr>> &&
+                             (... || (std::same_as<IgnoredTs,
+                                                   std::remove_cv_t<std::remove_pointer_t<std::remove_cvref_t<Ptr>>>>) )
+                constexpr auto operator()(UNUSED this auto&& self, Ptr&&) noexcept
+                        -> decltype(std::forward_like<decltype(self)>(self.callable)(std::declval<FullType>())) {
+                    std::unreachable();
+                }
+
+                template <typename T>
+                    requires(!std::is_pointer_v<std::remove_cvref_t<T>>) &&
+                            (... || (std::same_as<IgnoredTs, std::remove_cvref_t<T>>) )
+                constexpr auto operator()(UNUSED this auto&& self, T&&) noexcept
+                        -> decltype(std::forward_like<decltype(self)>(self.callable)(std::declval<FullType>())) {
+                    std::unreachable();
+                }
+            };
+
+            template <typename Func>
+            deref_lam_t(Func&&) -> deref_lam_t<std::remove_cvref_t<Func>>;
+
+            constexpr static auto valueDereferLam = deref_lam_t{
+                    []<typename Value>(Value&& value) -> decltype(auto) { return std::forward<Value>(value); }};
+        };
+
+        constexpr static auto valueDereferLam =
+                deref_lam_t{[]<typename Value>(Value&& value) -> decltype(auto) { return std::forward<Value>(value); }};
     };
+
+    constexpr struct NotDirty {
+    } notDirty{};
+
+    constexpr struct Deleted {
+    } deleted{};
 } // namespace cstd

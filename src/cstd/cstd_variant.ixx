@@ -1,6 +1,6 @@
 module;
 
-#include <cassert>
+#include <ostream>
 #include <optional>
 #include <variant>
 #include "macro.h"
@@ -25,11 +25,7 @@ export namespace cstd {
         }
     };
 
-    enum class EmptyValueMode : uint8_t {
-        HAS,
-        HAS_IGNORE_VISIT,
-        HASNT
-    };
+    enum class EmptyValueMode : uint8_t { HAS, HAS_IGNORE_VISIT, HASNT };
 
     namespace _internal {
         template <size_t, EmptyValueMode, typename...>
@@ -41,56 +37,47 @@ export namespace cstd {
         : std::variant<OptPtrTBy<DerefTypes, little>...>,
           std::conditional_t<emptyValueMode != EmptyValueMode::HASNT, emptiable_variant_p_mxn<DerefTypes...[0]>,
                              _internal::_0_variant_of_ptrs_and_little<little, emptyValueMode, DerefTypes...>> {
+        static_assert(sizeof...(DerefTypes) >= 1);
+
         using varT = std::variant<OptPtrTBy<DerefTypes, little>...>;
+        using varT::varT;
 
         template <typename DerefType>
         using GetOptimType = OptPtrTBy<DerefType, little>;
 
     private:
         using EmptyType = GetOptimType<DerefTypes...[0]>;
-        using AnyFullType = decltype([] {
-            if constexpr (sizeof...(DerefTypes) > 1) {
-                return dstd::args::TypeWrapper<GetOptimType<DerefTypes...[1]>>{};
-            } else {
-                return dstd::args::TypeWrapper<void>{};
-            }
-        }())::InstanceT;
+
+        static constexpr size_t firstFullIdx = (emptyValueMode == EmptyValueMode::HASNT ? 0 : 1);
+        static constexpr bool hasFullType = (sizeof...(DerefTypes) > firstFullIdx);
+
+        using UtilsWithIgnore = std::conditional_t<emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT,
+                                                   utils_with_ignore<EmptyType>, utils_with_ignore<>>;
+
+        static_assert(!(emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT && !hasFullType),
+                      "Hasn't full type (first no empty) in empty ignore variant");
 
     public:
-        NODISCARD F_INLINE static auto add_emp_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
-            if constexpr (emptyValueMode != EmptyValueMode::HASNT) {
-                return overload{emp_callable, callable};
+        template <bool empIgnoreIfShould = true, typename DirCallable>
+        NODISCARD F_INLINE static auto wrap_visitor_lam(DirCallable&& callable) noexcept {
+            using Callable = std::remove_cvref_t<DirCallable>;
+            if constexpr (empIgnoreIfShould && emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
+                return typename UtilsWithIgnore::template with_full_type<GetOptimType<DerefTypes...[firstFullIdx]>>::template deref_lam_t<Callable>{std::forward<DirCallable>(callable)};
             } else {
-                return callable;
+                return typename UtilsWithIgnore::template deref_lam_t<Callable>{std::forward<DirCallable>(callable)};
             }
         }
 
-        NODISCARD F_INLINE static auto add_emp_ignore_to_visit_lambda(auto&& callable, auto&& emp_callable) noexcept {
-            if constexpr (emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
-                return overload{emp_callable, callable};
-            } else {
-                return callable;
-            }
-        }
-
-        template <typename Callable>
-            requires(emptyValueMode != EmptyValueMode::HAS_IGNORE_VISIT || !std::same_as<AnyFullType, void>)
-        NODISCARD F_INLINE static auto emp_ignore_in_visit_lambda(Callable&& callable) noexcept {
-            if constexpr (emptyValueMode == EmptyValueMode::HAS_IGNORE_VISIT) {
-                using RetT = decltype(std::forward<Callable>(callable)(std::declval<AnyFullType>()));
-                return overload{std::forward<Callable>(callable), [](EmptyType) -> RetT { std::unreachable(); }};
-            } else {
-                return callable;
-            }
-        }
-
-        constexpr void destruct_deref() noexcept {
-            std::visit(overload{[](auto*& self) {
-                                    delete self;
-                                    self = nullptr;
+        constexpr void destruct_deref(this auto&& self) noexcept {
+            std::visit(overload{[](auto*& slf) {
+                                    delete slf;
+                                    slf = nullptr;
+                                },
+                                [](auto*&& slf) {
+                                    delete slf;
                                 },
                                 [](auto&&) {}},
-                       *this);
+                       self);
         }
 
         template <typename DerefType>
@@ -103,73 +90,80 @@ export namespace cstd {
         }
 
         template <typename Callable>
-        constexpr auto deref_visit(this auto&& slf, Callable&& callable) noexcept {
-            return std::visit(slf.emp_ignore_in_visit_lambda(overload{
-                                      [&]<typename T>(T* self) { return std::forward<Callable>(callable)(*self); },
-                                      [&](auto&& self) { return std::forward<Callable>(callable)(self); }}),
-                              slf);
+        constexpr decltype(auto) visit(this auto&& self, Callable&& callable) noexcept {
+            return std::visit(self.wrap_visitor_lam(std::forward<Callable>(callable)),
+                              std::forward_like<decltype(self)>(self));
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const variant_of_ptrs_and_little self) {
+        template <size_t idx>
+        constexpr decltype(auto) get(this auto&& self) noexcept {
+            return UtilsWithIgnore::valueDereferLam(std::get<idx>(std::forward_like<decltype(self)>(self)));
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const variant_of_ptrs_and_little& self) {
             os << "vptral<" << self.index() << ">";
-            auto lambda0 = overload{[&os](auto* selfVal) {
+            auto lambda0 = overload{[&os](auto* slf) {
                                         os << "*(";
-                                        selfVal->operatorKK(os);
+                                        os << (*slf);
                                         os << ")";
                                     },
-                                    [&os](auto selfVal) {
+                                    [&os]<typename T0>(T0&& slf) {
                                         os << "(";
-                                        selfVal.operatorKK(os);
+                                        os << std::forward<T0>(slf);
                                         os << ")";
                                     }};
             auto lambda = add_emp_to_visit_lambda(lambda0, [&os](EmptyType) { os << "EMPTY()"; });
-            std::visit(lambda, self);
+            std::visit(lambda, std::forward_like<decltype(self)>(self));
             return os;
         }
 
-        /*implicit*/ variant_of_ptrs_and_little(const variant_of_ptrs_and_little& other) noexcept : varT(other) {
+        IMPLICIT variant_of_ptrs_and_little(const variant_of_ptrs_and_little& other) noexcept : varT(other) {
         }
-        /*implicit*/ variant_of_ptrs_and_little(variant_of_ptrs_and_little&& other) noexcept : varT(std::move(other)) {
-        }
-
-        variant_of_ptrs_and_little& operator=(const variant_of_ptrs_and_little& other) noexcept {
-            if (this != &other) {
-                varT::operator=(other);
-            }
-            return *this;
+        IMPLICIT variant_of_ptrs_and_little(variant_of_ptrs_and_little&& other) noexcept : varT(std::move(other)) {
         }
 
-        variant_of_ptrs_and_little& operator=(variant_of_ptrs_and_little&& other) noexcept {
-            if (this != &other) {
-                varT::operator=(other);
-            }
-            return *this;
+        variant_of_ptrs_and_little& operator=(const variant_of_ptrs_and_little&) noexcept = default;
+        variant_of_ptrs_and_little& operator=(variant_of_ptrs_and_little&&) noexcept = default;
+
+        IMPLICIT variant_of_ptrs_and_little() noexcept
+            requires(emptyValueMode != EmptyValueMode::HASNT) &&
+                    (!cstd::larger_than<EmptyType, little>) && std::is_default_constructible_v<EmptyType>
+            : varT(EmptyType{}) {
         }
 
+        IMPLICIT variant_of_ptrs_and_little() noexcept
+            requires(emptyValueMode != EmptyValueMode::HASNT) && cstd::larger_than<EmptyType, little> &&
+                    std::is_default_constructible_v<EmptyType>
+            : varT(cstd::copy_to_heap(EmptyType{})) {
+        }
         template <typename T>
-        /*implicit*/ constexpr variant_of_ptrs_and_little(const T value) noexcept
+        IMPLICIT constexpr variant_of_ptrs_and_little(const T value) noexcept
             requires(!cstd::larger_than<T, little>) && (!std::is_same_v<T, variant_of_ptrs_and_little>)
             : varT(value) {
         }
 
         template <typename T>
         // NOLINTNEXTLINE(*-forwarding-reference-overload)
-        /*implicit*/ variant_of_ptrs_and_little(T&& value) noexcept
+        IMPLICIT variant_of_ptrs_and_little(T&& value) noexcept
             requires cstd::larger_than<std::remove_cvref_t<T>, little> &&
                      (!std::same_as<std::remove_cvref_t<T>, variant_of_ptrs_and_little>)
             : varT(cstd::copy_to_heap(std::forward<T>(value))) {
         }
+    };
 
-        /*implicit*/ variant_of_ptrs_and_little() noexcept
-            requires(emptyValueMode != EmptyValueMode::HASNT) &&
-                    (!cstd::larger_than<EmptyType, little>) && std::is_default_constructible_v<EmptyType>
-            : varT(EmptyType{}) {
+    // Jaac Wrapper
+    template <typename... Types>
+    struct jcw_variant : std::variant<Types...> {
+        using std::variant<Types...>::variant;
+
+        template <typename Callable>
+        NODISCARD decltype(auto) visit(this auto&& self, Callable&& callable) {
+            return std::visit(std::forward<Callable>(callable), std::forward_like<decltype(self)>(self));
         }
 
-        /*implicit*/ variant_of_ptrs_and_little() noexcept
-            requires(emptyValueMode != EmptyValueMode::HASNT) && cstd::larger_than<EmptyType, little> &&
-                    std::is_default_constructible_v<EmptyType>
-            : varT(cstd::copy_to_heap(EmptyType{})) {
+        template <size_t idx>
+        NODISCARD constexpr decltype(auto) get(this auto&& self) noexcept {
+            return std::get<idx>(std::forward_like<decltype(self)>(self));
         }
     };
 
@@ -189,7 +183,7 @@ export namespace cstd {
         var_opt() noexcept : var(Variant{EmptyT{}}) {
         }
 
-        /*implicit*/ var_opt(Variant var) noexcept : var(var) {
+        IMPLICIT var_opt(Variant var) noexcept : var(var) {
         }
 
         NODISCARD explicit operator bool() const noexcept {
@@ -197,10 +191,10 @@ export namespace cstd {
         }
 
         NODISCARD decltype(auto) operator*(this auto&& self) noexcept {
-            return self.var;
+            return std::forward_like<decltype(self)>(self.var);
         }
 
-        /*implicit*/ operator std::optional<Variant>() const noexcept {
+        IMPLICIT operator std::optional<Variant>() const noexcept {
             return std::optional{var};
         }
     };

@@ -7,6 +7,6 @@ export module compl_flags;
 
 export struct cflags {
     struct class_file_ptr {
-        CSFLAG CheckMemorySize = true;
+        COM_BOOL checkMemorySize = true;
     };
 };

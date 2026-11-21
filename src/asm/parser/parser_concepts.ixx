@@ -2,7 +2,6 @@ module;
 
 #include <concepts>
 #include <optional>
-#include <vector>
 
 #include "../../cstd/costd_mcr.h"
 #include "parser_mcr.h"
@@ -10,22 +9,31 @@ module;
 export module parser_concepts;
 
 import parser_utils;
-import read_utils;
-import parser_b1;
 import dstd;
 import gstd;
 import costd;
-import parser_wrappers_b2;
 import simple_cstd;
 
 export namespace parser {
     template <typename ClassNT>
-    concept useWriteConcept = DEF_BOOL_CNT_FLAG(useWrite);
+    concept UseWriteConcept = DEF_BOOL_CNT_FLAG(useWrite);
 
     template <typename T, typename SpecR>
     concept JaacParsable = requires(T t, ReadPtrBySpec<SpecR>& readPtr) {
         { T::parse(readPtr) } -> cstd::is_opt_t<cstd::SameAsCowr<T&>>;
+        { T::parse(std::declval<ReadPtrBySpec<SpecR>>()) } -> cstd::is_opt_t<cstd::SameAsCowr<T&>>;
         { T::check_and_move(readPtr) } -> std::same_as<bool>;
+        { T::check_and_move(std::declval<ReadPtrBySpec<SpecR>>()) } -> std::same_as<bool>;
+    };
+
+    template <typename T, typename... Args>
+    concept JaacDeepParsable = requires(T t, Args&&... args) {
+        { t.deep_parse(std::forward<Args>(args)...) } -> gstd::bool_or_true;
+    };
+
+    template <typename T, typename... Args>
+    concept JaacComplexParsable = requires(Args&&... args) {
+        { T::complex_parse(std::forward<Args>(args)...) } -> cstd::is_opt_t<cstd::SameAsCowr<T&>>;
     };
 
     template <typename T, typename SpecW>
@@ -50,6 +58,15 @@ export namespace parser {
     // optional:
     // { t.postread_handle() } -> std::same_as<void>;
 
+    template <typename T, typename SpecR, typename SpecW>
+    concept JaacUnsafeClassNT = JaacClassNT<T> && requires (T t) {
+        requires JaacSerDeserable<decltype(t.cpool), SpecR, SpecW>;
+        requires JaacSerDeserable<decltype(t.ifaces), SpecR, SpecW>;
+        requires JaacSerDeserable<decltype(t.fields), SpecR, SpecW>;
+        requires JaacSerDeserable<decltype(t.methods), SpecR, SpecW>;
+        requires JaacSerDeserable<decltype(t.attrs), SpecR, SpecW>;
+    };
+
     template <typename ClassNT>
     // ReSharper disable once CppRedundantParentheses
     using JaacClassNTRetConverted = TYPE_WRAPPER_LAMBDA({
@@ -69,25 +86,22 @@ export namespace parser {
     };
 
     template <typename T, typename AddingElT>
-    concept JaacCollection = requires(T t, size_t iSize, AddingElT inEl) {
-        { t.jaac_reserve(iSize) } -> std::same_as<void>;
+    concept JaacCollection = requires(T t, size_t i, AddingElT inEl) {
+        { t.jaac_reserve(i) } -> std::same_as<void>;
         { t.jaac_push_back(inEl) } -> gstd::bool_or_true;
         // ReSharper disable once CppFunctionDoesntReturnValue
-        {
-            t.jaac_emplace_back(cstd::emplacer{[]() -> AddingElT & {}})
-        } -> gstd::bool_or_true;
+        { t.jaac_emplace_back(std::move(inEl)) } -> gstd::bool_or_true;
         { t.jaac_size() } -> std::same_as<size_t>;
         // optional:
         // { t.jaac_start_handle(node) } -> std::same_as<void>;
         // { t.jaac_postcomplete_handle(node) } -> std::same_as<void>;
-        // { t.jaac_prewrite_handle(node) } -> std::same_as<void>;
     } && std::is_default_constructible_v<T>;
 
     template <typename T>
-    concept JaacTranslator = requires(T t, u8_ptr pos, size_t iSize) {
+    concept JaacTranslator = requires(T t, u8_ptr pos, size_t i) {
         { t.jaac_set_source_data_interval_begin(pos) } -> std::same_as<void>;
         { t.jaac_set_source_data_interval_end(pos) } -> std::same_as<void>;
-        { t.jaac_set_source_data_size(iSize) } -> std::same_as<void>;
+        { t.jaac_set_source_data_size(i) } -> std::same_as<void>;
         { t.jaac_get_source_data_interval_begin() } -> std::same_as<u8_ptr>;
         { t.jaac_get_source_data_interval_end() } -> std::same_as<u8_ptr>;
         { t.jaac_get_source_data_size() } -> std::same_as<size_t>;
@@ -103,16 +117,5 @@ export namespace parser {
     struct JaacDeserableCowr {
         template <typename T>
         COWR_INST = JaacDeserable<T, SpecW>;
-    };
-
-    // Cowrs
-    struct FieldInfoCowr {
-        template <typename T, typename AttrSpanCowr>
-        COWR_INST = requires(T t) {
-            requires cstd::is_implicit_convertable<decltype(t.accessFlags), wrappers::AccessFlags>;
-            requires cstd::is_implicit_convertable<decltype(t.nameIdx), wrappers::CpoolSizeT>;
-            requires cstd::is_implicit_convertable<decltype(t.descriptorIdx), wrappers::CpoolSizeT>;
-            requires AttrSpanCowr::COWR_USE<decltype(t.attrs)>;
-        };
     };
 } // namespace parser

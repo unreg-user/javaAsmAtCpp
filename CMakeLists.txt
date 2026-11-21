@@ -37,6 +37,9 @@ target_sources(javaAsmAtCpp
         src/asm/impl_base/nodes/nodes_macro.h
 
         PUBLIC FILE_SET CXX_MODULES FILES
+        src/cstd/macro_u.ixx
+
+        PUBLIC FILE_SET CXX_MODULES FILES
         src/cstd/cstd_variant.ixx
         src/cstd/cached_2linked_list.ixx
         src/cstd/simple_cstd.ixx
@@ -52,10 +55,9 @@ target_sources(javaAsmAtCpp
         src/asm/parser/parser_utils.ixx
         src/asm/parser/parser_concepts.ixx
         src/asm/parser/array_parsers.ixx
-        src/asm/utils/read_utils.ixx
-        src/asm/parser/base_classes/parser_b1.ixx
-        src/asm/parser/base_classes/parser_b2.ixx
-        src/asm/parser/base_classes/parser_wrappers_b2.ixx
+        src/asm/parser/base_classes/parser_mxns.ixx
+        src/asm/parser/base_classes/parser_base.ixx
+        src/asm/parser/base_classes/parser_widstructs.ixx
         src/asm/parser/mcode/code_attr.ixx
         src/asm/parser/mcode/label.ixx
         src/compl_flags.ixx

@@ -3,6 +3,7 @@
     <words>
       <w>Cowr</w>
       <w>Cpool</w>
+      <w>Derefer</w>
       <w>Fieldref</w>
       <w>IFACES</w>
       <w>Ifaces</w>
@@ -11,6 +12,7 @@
       <w>Methodref</w>
       <w>Postfields</w>
       <w>Prevnearst</w>
+      <w>Rewr</w>
       <w>aaload</w>
       <w>aastore</w>
       <w>acmpeq</w>
@@ -27,6 +29,7 @@
       <w>caload</w>
       <w>castore</w>
       <w>checkcast</w>
+      <w>costd</w>
       <w>cpool</w>
       <w>daload</w>
       <w>dassert</w>
@@ -37,6 +40,7 @@
       <w>ddiv</w>
       <w>dmul</w>
       <w>dreturn</w>
+      <w>dstd</w>
       <w>emptnull</w>
       <w>faload</w>
       <w>fastore</w>
@@ -105,6 +109,7 @@
       <w>nstance</w>
       <w>offsetnearst</w>
       <w>postcomplete</w>
+      <w>postread</w>
       <w>prefields</w>
       <w>putfield</w>
       <w>putstatic</w>

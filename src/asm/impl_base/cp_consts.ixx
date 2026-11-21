@@ -4,6 +4,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <vector>
 
 #include "../../cstd/macro.h"
 #include "../parser/parser_mcr.h"
@@ -17,10 +18,12 @@ import opcodes;
 import parser_utils;
 import dstd;
 import cstd_variant;
-import read_utils;
-import parser_wrappers_b2;
+import parser_widstructs;
 import gstd;
-import parser_b2;
+import parser_base;
+import parser_mxns;
+import macro_u;
+import parser_concepts;
 
 export namespace cp_consts {
     using SizeT = parser::wrappers::CpoolSizeT;
@@ -28,8 +31,8 @@ export namespace cp_consts {
     using TagIdTypeT = parser::wrappers::Number<opcodes::TagIdEnum>;
 
     namespace inst {
-        template <opcodes::TagIdEnum tag, typename Prim, typename RawPrim = gstd::GetWidstructDefBaser<Prim>::Result>
-        struct Primitive : parser::common::SerCombinatorPMxn<Primitive<tag, Prim, RawPrim>, Prim> {
+        template <opcodes::TagIdEnum tag, typename Prim, typename RawPrim = gstd::GetWidTypeOrVoid<Prim>>
+        struct Primitive : parser::mxns::SerCombinatorPMxn<Primitive<tag, Prim, RawPrim>, Prim> {
             Prim value{};
 
             TAG_FLAG(tag);
@@ -40,7 +43,7 @@ export namespace cp_consts {
             constexpr Primitive() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept {
-                return std::to_string(static_cast<cstd::GetMinNumStrUType<RawPrim>>(gstd::unwrap(value)));
+                return std::to_string(static_cast<cstd::GetMinNumStrUType<RawPrim>>(value));
             }
 
             template <typename SpecW>
@@ -50,7 +53,7 @@ export namespace cp_consts {
             }
         };
 
-        struct Class : parser::common::SerCombinatorPMxn<Class, SizeT> {
+        struct Class : parser::mxns::SerCombinatorPMxn<Class, SizeT> {
             SizeT classIdx{};
 
             explicit constexpr Class(const SizeT v) noexcept : classIdx(v) {
@@ -61,7 +64,7 @@ export namespace cp_consts {
             DEF_TAG_FLAG(CONSTANT_Class)
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(classIdx));
+                return "#" + std::to_string(classIdx);
             }
 
             template <typename SpecW>
@@ -72,7 +75,7 @@ export namespace cp_consts {
         };
 
         template <opcodes::TagIdEnum tag>
-        struct MF : parser::common::SerCombinatorPMxn<MF<tag>, SizeT, SizeT> {
+        struct MF : parser::mxns::SerCombinatorPMxn<MF<tag>, SizeT, SizeT> {
             SizeT classIdx{};
             SizeT nameAndTypeIdx{};
 
@@ -85,8 +88,7 @@ export namespace cp_consts {
             constexpr MF() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(classIdx)) + ".#" +
-                       std::to_string(gstd::unwrap(nameAndTypeIdx));
+                return "#" + std::to_string(classIdx) + ".#" + std::to_string(nameAndTypeIdx);
             }
 
             template <typename SpecW>
@@ -97,7 +99,7 @@ export namespace cp_consts {
             }
         };
 
-        struct String : parser::common::SerCombinatorPMxn<String, SizeT> {
+        struct String : parser::mxns::SerCombinatorPMxn<String, SizeT> {
             SizeT stringIdx{};
 
             DEF_TAG_FLAG(CONSTANT_String)
@@ -108,7 +110,7 @@ export namespace cp_consts {
             constexpr String() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(stringIdx));
+                return "#" + std::to_string(stringIdx);
             }
 
             template <typename SpecW>
@@ -119,7 +121,7 @@ export namespace cp_consts {
         };
 
         template <opcodes::TagIdEnum tag>
-        struct MP : parser::common::SerCombinatorPMxn<MP<tag>, SizeT> {
+        struct MP : parser::mxns::SerCombinatorPMxn<MP<tag>, SizeT> {
             SizeT nameIdx{};
 
             TAG_FLAG(tag)
@@ -136,7 +138,7 @@ export namespace cp_consts {
             }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(nameIdx));
+                return "#" + std::to_string(nameIdx);
             }
         };
 
@@ -153,7 +155,7 @@ export namespace cp_consts {
             constexpr MethodHandle() noexcept = default;
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return std::to_string(gstd::unwrap(refKind)) + ":#" + std::to_string(gstd::unwrap(refIdx));
+                return std::to_string(refKind) + ":#" + std::to_string(refIdx);
             }
 
             template <typename SpecR>
@@ -167,8 +169,23 @@ export namespace cp_consts {
             }
 
             template <typename SpecR>
+            NODISCARD static constexpr std::optional<MethodHandle>
+            parse(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                const auto refKind = RefKindT::parse(readPtr);
+                const auto refIdx = SizeT::parse(std::move(readPtr));
+                if (!(refKind && refIdx)) [[unlikely]]
+                    return std::nullopt;
+                return {MethodHandle{*refIdx, *refKind}};
+            }
+
+            template <typename SpecR>
             NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 return RefKindT::check_and_move(readPtr) && SizeT::check_and_move(readPtr);
+            }
+
+            template <typename SpecR>
+            NODISCARD static constexpr bool check_and_move(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                return RefKindT::check_and_move(readPtr) && SizeT::check_and_move(std::move(readPtr));
             }
 
             template <typename SpecW>
@@ -179,8 +196,7 @@ export namespace cp_consts {
             }
         };
 
-        struct NameAndType
-            : parser::common::SerCombinatorPMxn<NameAndType, SizeT, SizeT> {
+        struct NameAndType : parser::mxns::SerCombinatorPMxn<NameAndType, SizeT, SizeT> {
             SizeT nameIdx{}, descIdx{};
 
             DEF_TAG_FLAG(CONSTANT_NameAndType)
@@ -199,11 +215,11 @@ export namespace cp_consts {
             }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(nameIdx)) + ":#" + std::to_string(gstd::unwrap(descIdx));
+                return "#" + std::to_string(nameIdx) + ":#" + std::to_string(descIdx);
             }
         };
 
-        struct MethodType : parser::common::SerCombinatorPMxn<MethodType, SizeT> {
+        struct MethodType : parser::mxns::SerCombinatorPMxn<MethodType, SizeT> {
             SizeT descIdx{};
 
             DEF_TAG_FLAG(CONSTANT_MethodType)
@@ -220,12 +236,12 @@ export namespace cp_consts {
             }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(descIdx));
+                return "#" + std::to_string(descIdx);
             }
         };
 
         template <opcodes::TagIdEnum tag>
-        struct Dynamic : parser::common::SerCombinatorPMxn<Dynamic<tag>, SizeT, SizeT> {
+        struct Dynamic : parser::mxns::SerCombinatorPMxn<Dynamic<tag>, SizeT, SizeT> {
             SizeT bootstrapMethodAttrIdx{}, nameAndTypeIdx{};
 
             TAG_FLAG(tag)
@@ -244,18 +260,16 @@ export namespace cp_consts {
             }
 
             NODISCARD std::string to_str() const noexcept { // NOLINT(*-convert-member-functions-to-static)
-                return "#" + std::to_string(gstd::unwrap(bootstrapMethodAttrIdx)) + ":#" +
-                       std::to_string(gstd::unwrap(nameAndTypeIdx));
+                return "#" + std::to_string(bootstrapMethodAttrIdx) + ":#" + std::to_string(nameAndTypeIdx);
             }
         };
 
-        struct SourceUtf8 : parser::common::SerCombinatorPMxn<SourceUtf8, parser::common::RawJaacSpan<>> {
+        struct SourceUtf8 : parser::mxns::SerCombinatorPMxn<SourceUtf8, parser::common::RawJaacSpan<>> {
             parser::common::RawJaacSpan<> span{nullptr};
 
             DEF_TAG_FLAG(CONSTANT_Utf8)
 
-            explicit constexpr SourceUtf8(const parser::common::RawJaacSpan<> span) noexcept :
-                span(span) {
+            explicit constexpr SourceUtf8(const parser::common::RawJaacSpan<> span) noexcept : span(span) {
             }
 
             constexpr SourceUtf8() noexcept = default;
@@ -271,13 +285,12 @@ export namespace cp_consts {
             }
         };
 
-        struct CustomUtf8 : parser::common::SerCombinatorPMxn<CustomUtf8, parser::common::RawAnyJaacSpan<>> {
+        struct CustomUtf8 : parser::mxns::SerCombinatorPMxn<CustomUtf8, parser::common::RawAnyJaacSpan<>> {
             parser::common::RawAnyJaacSpan<> span{};
 
             DEF_TAG_FLAG(CONSTANT_Utf8)
 
-            explicit constexpr CustomUtf8(const parser::common::RawAnyJaacSpan<> span) noexcept :
-                span(span) {
+            explicit constexpr CustomUtf8(const parser::common::RawAnyJaacSpan<> span) noexcept : span(span) {
             }
 
             constexpr CustomUtf8() noexcept = default;
@@ -327,7 +340,7 @@ export namespace cp_consts {
 
     template <typename LambdaRetType>
     CPP_KOSTYL std::optional<LambdaRetType> trait_switch_tag_id_enum(const opcodes::TagIdEnum tagId,
-                                                                          auto&& callable) noexcept {
+                                                                     auto&& callable) noexcept {
         switch (tagId) {
             SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Integer, Integer); // NOLINT(*-branch-clone)
             SWITCH_TAG_CASE_GEN(opcodes::TagIdEnum::CONSTANT_Float, Float);
@@ -385,11 +398,13 @@ export namespace cp_consts {
         return stream << tag_to_str(tagId);
     }
 
-    template <bool handle = false, typename SpecR>
-    bool parse1_const_big_ctx(parser::ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept;
+    template <bool handle = false, typename DirReadPtr>
+    bool parse1_const_big_ctx(DirReadPtr&& readPtr, auto&& handler) noexcept;
 
     namespace traits {
         struct cp_var : VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr> {
+            using VariantAll::Wrap<cstd::emp_ignore_variant_of_ptrs_and_little_t_ptr>::Wrap;
+
             template <typename SpecR>
             NODISCARD static cstd::var_opt<cp_var> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 cp_var var;
@@ -399,8 +414,22 @@ export namespace cp_consts {
             }
 
             template <typename SpecR>
+            NODISCARD static cstd::var_opt<cp_var> parse(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                cp_var var;
+                if (!parse1_const_big_ctx<true>(std::move(readPtr),
+                                                [&](TagIdTypeT, const cp_var& value) { var = value; }))
+                    return {};
+                return var;
+            }
+
+            template <typename SpecR>
             NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 return parse1_const_big_ctx<false>(readPtr, [](TagIdTypeT) {});
+            }
+
+            template <typename SpecR>
+            NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                return parse1_const_big_ctx<false>(std::move(readPtr), [](TagIdTypeT) {});
             }
 
             template <typename SpecW, bool unlikely = false>
@@ -427,35 +456,31 @@ export namespace cp_consts {
 
         // ReSharper disable once CppPassValueParameterByConstReference
         std::string variant_to_str(const cp_var var) noexcept { // NOLINT(*-unnecessary-value-param)
-            return var.is_holds_empty() ? var.deref_visit([](auto&& value) -> std::string { return value.to_str(); })
-                                        : std::string{"EMPTY"};
+            return !var.is_holds_empty() ? var.visit([](auto&& value) -> std::string { return value.to_str(); })
+                                         : std::string{"EMPTY"};
         }
     } // namespace traits
 
-    template <bool handle = false, typename SpecR>
-    bool parse1_const_big_ctx(parser::ReadPtrBySpec<SpecR>& readPtr, auto&& handler) noexcept {
-        DEF_OR_ELSE_RET_FALSE(TagIdTypeT, tagId);
+    template <bool handle = false, typename DirReadPtr>
+    bool parse1_const_big_ctx(DirReadPtr&& readPtr, auto&& handler) noexcept {
+        PARSE_OR_RET_FALSE(TagIdTypeT, tagId);
 
-        const auto handle_lambda = [&readPtr] {
+        auto handle_lambda = [&readPtr] <typename Trait> () mutable {
             if constexpr (handle) {
-                return [&readPtr]<typename Trait>() noexcept -> traits::opt_cp_var {
-                    if (auto value = Trait::parse(readPtr)) {
-                        return {{*value}};
-                    }
-                    return {};
-                };
+                if (auto value = Trait::parse(std::forward<DirReadPtr>(readPtr))) {
+                    return traits::opt_cp_var{traits::cp_var{*value}};
+                }
+                return traits::opt_cp_var{};
             } else {
-                return [&readPtr]<typename Trait>() noexcept -> bool {
-                    return Trait::check_and_move(readPtr);
-                };
+                return Trait::check_and_move(std::forward<DirReadPtr>(readPtr));
             }
-        }();
+        };
 
         auto result = cp_consts::trait_switch_tag_id_enum<std::conditional_t<handle, traits::opt_cp_var, bool>>(
-                tagId, handle_lambda);
+                tagId, std::move(handle_lambda));
 
-        DEF_ASSERT_FALSE(result);
-        DEF_ASSERT_FALSE(*result);
+        ul_assert_false(result);
+        ul_assert_false(*result);
 
         if constexpr (handle) {
             handler(tagId, **result);
@@ -463,6 +488,116 @@ export namespace cp_consts {
             handler(tagId);
         }
 
-        return false;
+        return true;
     }
+
+    template <parser::ParseJaacComplexCollMode mode, typename SpecR>
+    NODISCARD constexpr bool opt_parse_cpool_coll(parser::ReadPtrBySpec<SpecR>& readPtr, const parser::CpoolRSizeT cpoolSize,
+                                                  auto& cpoolJaacColl) noexcept {
+        using namespace parser;
+
+        auto skipIdxInColl = [&](bool& isUnex) {
+            if constexpr (mode == ParseJaacComplexCollMode::PARSE) {
+                isUnex = isUnex || !cpoolJaacColl.jaac_emplace_back(traits::cp_var{});
+            } else if constexpr (mode == ParseJaacComplexCollMode::SKIP_AND_SAVE_INTERVALS) {
+                isUnex = isUnex || !cpoolJaacColl.jaac_emplace_back(common::RawAnyJaacSpan<>{});
+            }
+        };
+
+        {
+            bool isUnex = false;
+            skipIdxInColl(isUnex);
+            ul_assert_false(!isUnex);
+        }
+
+        for (CpoolRSizeT i = 1; i < static_cast<CpoolRSizeT>(cpoolSize); ++i) {
+            u8_ptr iOld = readPtr.i;
+            bool isUnex = false;
+            auto skipLDIdx = [&](const opcodes::TagIdEnum tagId) {
+                if (tagId == opcodes::TagIdEnum::CONSTANT_Double || tagId == opcodes::TagIdEnum::CONSTANT_Long) {
+                    skipIdxInColl(isUnex);
+                    i++;
+                }
+            };
+            COM_BOOL parseCpoolStructureFlag = (mode == ParseJaacComplexCollMode::PARSE);
+            isUnex = isUnex ||
+                     !cp_consts::parse1_const_big_ctx<parseCpoolStructureFlag>(
+                             readPtr,
+                             cstd::overload{[&](const opcodes::TagIdEnum tagId, traits::cp_var var) {
+                                                if constexpr (parseCpoolStructureFlag) {
+                                                    isUnex = !cpoolJaacColl.jaac_emplace_back(var);
+                                                    skipLDIdx(tagId);
+                                                }
+                                            },
+                                            [&](const opcodes::TagIdEnum tagId) {
+                                                if constexpr (!parseCpoolStructureFlag) {
+                                                    isUnex = !cpoolJaacColl.jaac_emplace_back(common::RawAnyJaacSpan{
+                                                            static_cast<u8_span>(UncheckedReadPtr{iOld, readPtr.i})});
+                                                    skipLDIdx(tagId);
+                                                }
+                                            }});
+            ul_assert_false(!isUnex);
+        }
+        return true;
+    }
+
+    struct JaacCpoolVectorTySettings : parser::common::JaacVectorTySettings {
+        bool parseCpoolStructure = false;
+    };
+
+    namespace internal {
+        template <typename ElemT, JaacCpoolVectorTySettings settings, typename Self>
+        struct CpoolJaacVectorMethodsPMxn {
+        private:
+            using SizeT = parser::wrappers::CpoolSizeT;
+
+        public:
+            template <typename SpecR>
+            NODISCARD static std::optional<Self> parse(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                PARSE_N_UNWRAP_OR_RET_NULLOPT(SizeT, size);
+                Self self{};
+                ul_assert_nullopt(
+                        opt_parse_cpool_coll<settings.parseCpoolStructure
+                                                     ? parser::ParseJaacComplexCollMode::PARSE
+                                                     : parser::ParseJaacComplexCollMode::SKIP_AND_SAVE_INTERVALS>(
+                                readPtr, size, self));
+                return self;
+            }
+
+            template <typename SpecR>
+            NODISCARD static std::optional<Self> parse(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                return parse(readPtr);
+            }
+
+            template <typename SpecR>
+            NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>& readPtr) noexcept {
+                PARSE_OR_RET_FALSE(SizeT, size);
+                ul_assert_false(opt_parse_cpool_coll<parser::ParseJaacComplexCollMode::FULL_SKIP>(readPtr, size,
+                                                                                                  cstd::deleted));
+                return true;
+            }
+
+
+            template <typename SpecR>
+            NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+                return check_and_move(readPtr);
+            }
+        };
+    } // namespace internal
+
+    template <typename ElemT, JaacCpoolVectorTySettings settings = {}>
+    struct CpoolJaacVector : parser::common::JaacVector<ElemT, parser::wrappers::CpoolSizeT, settings>,
+                             internal::CpoolJaacVectorMethodsPMxn<ElemT, settings, CpoolJaacVector<ElemT, settings>> {
+        using parser::common::JaacVector<ElemT, parser::wrappers::CpoolSizeT, settings>::JaacVector;
+
+    protected:
+        COM size_t deser_start_idx = 1;
+
+    private:
+        using Base3 = internal::CpoolJaacVectorMethodsPMxn<ElemT, settings, CpoolJaacVector>;
+
+    public:
+        using Base3::check_and_move;
+        using Base3::parse;
+    };
 } // namespace cp_consts

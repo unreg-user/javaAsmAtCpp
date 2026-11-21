@@ -57,11 +57,11 @@ namespace insn {
         private:
 #ifndef NDEBUG
             constexpr void mark_unnew_in_linked2_cached_list() noexcept {
-                this->deref_visit(cstd::overload{[](const EmptyNode) noexcept {}, [](AbstractInsnNode& _node) noexcept { _node.isNew = false; }});
+                this->visit(cstd::overload{[](const EmptyNode) noexcept {}, [](AbstractInsnNode& _node) noexcept { _node.isNew = false; }});
             }
 
             NODISCARD constexpr bool is_valid_new_in_linked2_cached_list() const noexcept {
-                return this->deref_visit(cstd::overload{[](const EmptyNode) noexcept { return true; }, [](const AbstractInsnNode& _node) noexcept { return _node.isNew; }});
+                return this->visit(cstd::overload{[](const EmptyNode) noexcept { return true; }, [](const AbstractInsnNode& _node) noexcept { return _node.isNew; }});
             }
 #endif
 
@@ -79,7 +79,7 @@ namespace insn {
         };
 
         using InsnCList = c2l_list::CList<AnyInsnNode>;
-        using InsnCListB = c2l_list::CListB<AnyInsnNode>;
+        using InsnCListB = c2l_list::CListBuilder<AnyInsnNode>;
         using InsnBList = c2l_list::BList<AnyInsnNode>;
     }
 }
