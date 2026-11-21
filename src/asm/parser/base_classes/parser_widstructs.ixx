@@ -3,7 +3,6 @@ module;
 #include <optional>
 #include <bit>
 #include "../../../cstd/macro.h"
-#include "../../../cstd/gstd_mcr.h"
 
 export module parser_widstructs;
 
@@ -12,6 +11,7 @@ import simple_cstd;
 import gstd;
 import costd;
 import parser_mxns;
+import macro_u;
 
 export namespace parser::wrappers {
     template <typename T>
@@ -31,26 +31,28 @@ export namespace parser::wrappers {
 
         template <typename SpecR>
         F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            return readPtr.template check_and_move<T>();
+            ul_assert_false(readPtr.template check_and_move<T>());
+            return true;
         }
 
         template <typename SpecR>
         F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-            return std::move(readPtr).template check_and_move<T>();
+            ul_assert_false(std::move(readPtr).template check_and_move<T>());
+            return true;
         }
 
         template <typename SpecR>
         F_INLINE static std::optional<Number> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
             auto optT = readPtr.template parse_rev<T>();
-            if (!optT) [[unlikely]] return std::nullopt;
-            return std::optional{Number{*optT}};
+            ul_assert_nullopt(optT);
+            return std::optional{Number{*std::move(optT)}};
         }
 
         template <typename SpecR>
         F_INLINE static std::optional<Number> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
             auto optT = std::move(readPtr).template parse_rev<T>();
-            if (!optT) [[unlikely]] return std::nullopt;
-            return std::optional{Number{*optT}};
+            ul_assert_nullopt(optT);
+            return std::optional{Number{*std::move(optT)}};
         }
     };
 
@@ -117,34 +119,37 @@ export namespace parser::wrappers {
         using Base = gstd::any_widstruct<T>;
 
     public:
-        template <typename SpecR>
-        F_INLINE static std::optional<FlatNumber> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            auto optT = readPtr.template parse<T>();
-            if (!optT) [[unlikely]] return std::nullopt;
-            return std::optional{FlatNumber{*optT}};
-        }
-
-        template <typename SpecR>
-        F_INLINE static std::optional<FlatNumber> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-            auto optT = std::move(readPtr).template parse<T>();
-            if (!optT) [[unlikely]] return std::nullopt;
-            return std::optional{FlatNumber{*optT}};
-        }
-
-        template <typename SpecR>
-        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            return readPtr.template check_and_move<T>();
-        }
-
-        template <typename SpecR>
-        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-            return std::move(readPtr).template check_and_move<T>();
-        }
 
         template <typename SpecW>
         F_INLINE gstd::true_void deser(WritePtrBySpec<SpecW>& writePtr) const noexcept {
             writePtr.deser(this->instance);
             return {};
+        }
+
+        template <typename SpecR>
+        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            ul_assert_false(readPtr.template check_and_move<T>());
+            return true;
+        }
+
+        template <typename SpecR>
+        F_INLINE static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+            ul_assert_false(std::move(readPtr).template check_and_move<T>());
+            return true;
+        }
+
+        template <typename SpecR>
+        F_INLINE static std::optional<FlatNumber> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
+            auto optT = readPtr.template parse<T>();
+            ul_assert_nullopt(optT);
+            return std::optional{FlatNumber{*std::move(optT)}};
+        }
+
+        template <typename SpecR>
+        F_INLINE static std::optional<FlatNumber> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
+            auto optT = std::move(readPtr).template parse<T>();
+            ul_assert_nullopt(optT);
+            return std::optional{FlatNumber{*std::move(optT)}};
         }
     };
 

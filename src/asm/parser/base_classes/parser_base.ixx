@@ -29,11 +29,9 @@ export namespace parser::common {
         template <typename SpecW>
             requires JaacDeserable<SizeT, SpecW> && JaacDeserable<ElemT, SpecW>
         bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-            if (!static_cast<SizeT>(self.size()).deser(writePtr)) [[unlikely]]
-                return false;
+            ul_assert_false(static_cast<SizeT>(self.size()).deser(writePtr));
             for (auto& i : self)
-                if (!i.deser(writePtr)) [[unlikely]]
-                    return false;
+                ul_assert_false(i.deser(writePtr));
             return true;
         }
     };
@@ -45,13 +43,10 @@ export namespace parser::common {
         IMPLICIT RawAnyJaacSpan(std::span<RawElemT> span) noexcept : std::span<RawElemT>(span) {
         }
 
-        template <typename SpecW>
+        template <typename SpecW, typename Self>
         bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-            if (!static_cast<SizeT>(self.size()).deser(writePtr)) [[unlikely]]
-                return false;
-
-            writePtr.deser_range(self);
-
+            ul_assert_false(static_cast<SizeT>(self.size()).deser(writePtr));
+            writePtr.deser_range(std::forward<Self>(self));
             return true;
         }
     };
@@ -73,8 +68,8 @@ export namespace parser::common {
         template <typename SpecR>
             requires JaacParsable<SizeT, SpecR> && JaacParsable<ElemT, SpecR>
         NODISCARD static std::optional<JaacVector> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            PARSE_OR_RET_NULLOPT(SizeT, unrawSize);
-            const auto size = static_cast<size_t>(unrawSize);
+            PARSE_OR_RET_NULLOPT(SizeT, typedSize);
+            const auto size = static_cast<size_t>(typedSize);
 
             JaacVector self{};
             self.reserve(size);
@@ -116,9 +111,9 @@ export namespace parser::common {
         template <typename SpecR>
             requires JaacParsable<SizeT, SpecR> && JaacParsable<ElemT, SpecR>
         NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            PARSE_OR_RET_FALSE(SizeT, unrawSize);
+            PARSE_OR_RET_FALSE(SizeT, typedSize);
 
-            const auto size = static_cast<size_t>(unrawSize);
+            const auto size = static_cast<size_t>(typedSize);
 
             for (size_t i = 0; i < size; ++i) {
                 ul_assert_false(ElemT::check_and_move(readPtr));
@@ -225,26 +220,16 @@ export namespace parser::common {
         template <typename SpecR>
             requires JaacParsable<SizeT, SpecR>
         NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
-            if (!sizeOpt) [[unlikely]]
-                return false;
-
-            if (!readPtr.check_and_move(sizeof(RawElemT) * static_cast<size_t>(*sizeOpt))) [[unlikely]]
-                return false;
-
+            PARSE_OR_RET_FALSE(SizeT, typedSize);
+            ul_assert_false(readPtr.check_and_move(sizeof(RawElemT) * static_cast<size_t>(*typedSize)));
             return true;
         }
 
         template <typename SpecR>
             requires JaacParsable<SizeT, SpecR>
         NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
-            if (!sizeOpt) [[unlikely]]
-                return false;
-
-            if (!std::move(readPtr).check_and_move(sizeof(RawElemT) * static_cast<size_t>(*sizeOpt))) [[unlikely]]
-                return false;
-
+            PARSE_OR_RET_FALSE(SizeT, typedSize);
+            ul_assert_false(std::move(readPtr).check_and_move(sizeof(RawElemT) * static_cast<size_t>(*typedSize)));
             return true;
         }
 
@@ -252,8 +237,7 @@ export namespace parser::common {
             requires JaacParsable<SizeT, SpecR>
         NODISCARD static std::optional<RawJaacSpan> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
             auto sizePtr = readPtr.i;
-            if (!check_and_move(readPtr)) [[unlikely]]
-                return std::nullopt;
+            ul_assert_nullopt(check_and_move(readPtr));
             return std::optional{RawJaacSpan{sizePtr}};
         }
 
@@ -261,8 +245,7 @@ export namespace parser::common {
             requires JaacParsable<SizeT, SpecR>
         NODISCARD static std::optional<RawJaacSpan> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
             auto sizePtr = readPtr.i;
-            if (!check_and_move(std::move(readPtr))) [[unlikely]]
-                return std::nullopt;
+            ul_assert_nullopt(check_and_move(std::move(readPtr)));
             return std::optional{RawJaacSpan{sizePtr}};
         }
 
@@ -294,15 +277,11 @@ export namespace parser::common {
             requires JaacParsable<SizeT, SpecR>
         NODISCARD static std::optional<RawFullCachedJaacSpan> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
             auto sizePtr = readPtr.i;
-            /*opt<SizeT>*/ auto sizeOpt = SizeT::parse(readPtr);
-            if (!sizeOpt) [[unlikely]]
-                return std::nullopt;
-            SizeT typedSize = *sizeOpt;
+            PARSE_OR_RET_NULLOPT(SizeT, typedSize);
             const auto size = static_cast<size_t>(typedSize);
 
             u8_ptr first = readPtr.i;
-            if (!readPtr.check_and_move(sizeof(RawElemT) * size)) [[unlikely]]
-                return std::nullopt;
+            ul_assert_nullopt(readPtr.check_and_move(sizeof(RawElemT) * size));
 
             return std::optional{RawFullCachedJaacSpan{first, readPtr.i, sizePtr, typedSize}};
         }
@@ -325,12 +304,11 @@ export namespace parser::common {
             return RawJaacSpan<RawElemT, SizeT>::check_and_move(std::move(readPtr));
         }
 
-        template <typename SpecW>
+        template <typename SpecW, typename Self>
             requires JaacDeserable<SizeT, SpecW>
         bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-            if (!self.typedSize.deser(writePtr)) [[unlikely]]
-                return false;
-            writePtr.deser_range(self);
+            ul_assert_false(std::forward<Self>(self).typedSize.deser(writePtr));
+            writePtr.deser_range(std::forward<Self>(self));
             return true;
         }
 
@@ -366,10 +344,12 @@ export namespace parser::common {
     namespace internal {
         template <typename AttrsSpan>
         struct FullAttributeMethodsPart {
-            template <typename SpecW>
+            template <typename SpecW, typename Self>
                 requires JaacDeserable<AttrsSpan, SpecW>
-            bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-                return self.get_attr_name_idx().deser(writePtr) && static_cast<AttrsSpan>(self).deser(writePtr);
+            bool deser(this Self&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                ul_assert_false(self.get_attr_name_idx().deser(writePtr));
+                ul_assert_false(cstd::forward_static_cast<AttrsSpan>(std::forward<Self>(self)).deser(writePtr));
+                return true;
             }
         };
     } // namespace internal
@@ -502,10 +482,10 @@ export namespace parser::common {
 
         constexpr AttrsComponent() noexcept = default;
 
-        template <typename SpecW>
+        template <typename SpecW, typename Self>
             requires JaacDeserable<AttrsCont, SpecW>
-        auto deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-            return self.attrs.deser(writePtr);
+        auto deser(this Self&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+            return std::forward<Self>(self).attrs.deser(writePtr);
         }
 
         using SerCombinatorPMxn<AttrsComponent, AttrsCont>::parse;
@@ -517,10 +497,12 @@ export namespace parser::common {
 
     namespace internal {
         struct MFInfoNoattrDeserPart {
-            template <typename SpecW>
-            bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-                return self.accessFlags.deser(writePtr) && self.nameIdx.deser(writePtr) &&
-                       self.descriptorIdx.deser(writePtr);
+            template <typename SpecW, typename Self>
+            bool deser(this Self&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                ul_assert_false(std::forward<Self>(self).accessFlags.deser(writePtr));
+                ul_assert_false(std::forward<Self>(self).nameIdx.deser(writePtr));
+                ul_assert_false(std::forward<Self>(self).descriptorIdx.deser(writePtr));
+                return true;
             }
         };
     } // namespace internal

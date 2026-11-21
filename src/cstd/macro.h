@@ -43,6 +43,16 @@ CPP_KOSTYL // that it is not kw
     #define F_INLINE inline
 #endif
 
+
+
+#if defined(__clang__) || defined(__GNUC__)
+    #define INTRINSIC [[gnu::always_inline, gnu::artificial]] inline
+#elif defined(_MSC_VER)
+    #define INTRINSIC [[msvc::intrinsic]]
+#else
+    #define INTRINSIC inline
+#endif
+
 #if defined(__clang__) || defined(__GNUC__)
     #define ALLOCATOR [[gnu::malloc]]
 #elif defined(_MSC_VER)
@@ -83,15 +93,27 @@ CPP_KOSTYL // that it is not kw
 #ifndef NDEBUG
     #define dassert(expression, ...) \
         ((void)( \
-            (!!(expression)) ? 0 : (macro_internal::_dassert(#expression, __FILE__, (unsigned)(__LINE__), "" __VA_OPT__(__VA_ARGS__)), 0) \
+            (!!(expression)) ? 0 : (macro_internal::_dassert(#expression, __FILE__, (unsigned)(__LINE__), __VA_OPT__(__VA_ARGS__)), 0) \
         ))
 #else
     #define dassert(expression, ...) ((void) 0)
 #endif
 
 #ifndef NDEBUG
-    #define ul_assert_false(...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return false; )
-    #define ul_assert_nullopt(...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "in "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return std::nullopt; )
+    #define make_assertor(...) macro_internal::assertor_{__VA_ARGS__, "at: "#__VA_ARGS__ }
+#else
+    #define make_assertor(...) MACRO_BOOL_CAST(__VA_ARGS__)
+#endif
+
+#ifndef NDEBUG
+    #define make_raw_assertor(...) macro_internal::assertor_{__VA_ARGS__}
+#else
+    #define make_raw_assertor(...) MACRO_BOOL_CAST(__VA_ARGS__)
+#endif
+
+#ifndef NDEBUG
+    #define ul_assert_false(...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "at: "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return false; )
+    #define ul_assert_nullopt(...) DW0( bool timed_bl_result = MACRO_BOOL_CAST(__VA_ARGS__); dassert(timed_bl_result, "at: "#__VA_ARGS__); if (!timed_bl_result) [[unlikely]] return std::nullopt; )
 #else
     #define ul_assert_false(...) DW0( if (MACRO_NEGATIVE_BOOL_CAST(__VA_ARGS__)) [[unlikely]] return false; )
     #define ul_assert_nullopt(...) DW0( if (MACRO_NEGATIVE_BOOL_CAST(__VA_ARGS__)) [[unlikely]] return std::nullopt; )

@@ -11,6 +11,7 @@ import parser_utils;
 import simple_cstd;
 import gstd;
 import parser_concepts;
+import macro_u;
 
 export namespace parser::mxns {
     struct JaacIterablePMxn {
@@ -35,13 +36,17 @@ export namespace parser::mxns {
         }
 
         template <typename Element>
-        gstd::true_void jaac_push_back(this auto&& self, Element&& element) requires requires { self.push_back(std::forward<Element>(element)); } {
+        gstd::true_void jaac_push_back(this auto&& self, Element&& element)
+            requires requires { self.push_back(std::forward<Element>(element)); }
+        {
             self.push_back(std::forward<Element>(element));
             return {};
         }
 
         template <typename Element>
-        gstd::true_void jaac_emplace_back(this auto&& self, Element&& element) requires requires { self.emplace_back(std::forward<Element>(element)); } {
+        gstd::true_void jaac_emplace_back(this auto&& self, Element&& element)
+            requires requires { self.emplace_back(std::forward<Element>(element)); }
+        {
             self.emplace_back(std::forward<Element>(element));
             return {};
         }
@@ -107,8 +112,7 @@ export namespace parser::mxns {
     struct RewrapperPMxn {
     private:
         NODISCARD static std::optional<Self> opt_impl_construct_self(auto&& from) noexcept {
-            if (!from) [[unlikely]]
-                return std::nullopt;
+            ul_assert_nullopt(from);
             return std::optional{Self(std::forward_like<decltype(from)>(*from))};
         }
 
@@ -146,11 +150,12 @@ export namespace parser::mxns {
     private:
         template <typename... Types2>
         NODISCARD static std::optional<Self> after_read_parse(std::tuple<Types2...>&& parsedTuple) noexcept {
-            if (!std::apply(
-                        []<typename... Parsed>(Parsed&&... parsed) { return (... && std::forward<Parsed>(parsed)); },
-                        parsedTuple)) [[unlikely]] {
-                return std::nullopt;
-            }
+            ul_assert_nullopt(std::apply(
+                    // "keyword"
+                    []<typename... Parsed>(Parsed&&... parsed) {
+                        return (... && make_assertor(std::forward<Parsed>(parsed)));
+                    },
+                    parsedTuple));
 
             return std::apply(
                     []<typename... Parsed>(Parsed&&... parsed) -> std::optional<Self> {
@@ -171,17 +176,15 @@ export namespace parser::mxns {
         NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
             return [&]<size_t... Is>(std::index_sequence<Is...>) -> std::optional<Self> {
                 static constexpr size_t Last = sizeof...(Types) - 1;
-                return after_read_parse(std::tuple{
-                    Types...[Is]::parse(readPtr)...,
-                    Types...[Last]::parse(std::move(readPtr))
-                });
+                return after_read_parse(
+                        std::tuple{Types...[Is] ::parse(readPtr)..., Types...[Last] ::parse(std::move(readPtr))});
             }(std::make_index_sequence<sizeof...(Types) - 1>{});
         }
 
         template <typename SpecR>
             requires(... && JaacParsable<Types, SpecR>)
         NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-            return (... && Types::check_and_move(readPtr));
+            return (... && make_assertor(Types::check_and_move(readPtr)));
         }
 
         template <typename SpecR>
@@ -189,7 +192,8 @@ export namespace parser::mxns {
         NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
             return [&]<size_t... Is>(std::index_sequence<Is...>) -> bool {
                 static constexpr size_t Last = sizeof...(Types) - 1;
-                return (... && Types...[Is]::check_and_move(readPtr)) && Types...[Last]::check_and_move(std::move(readPtr));
+                return (... && make_assertor(Types...[Is] ::check_and_move(readPtr))) &&
+                       make_assertor(Types...[Last] ::check_and_move(std::move(readPtr)));
             }(std::make_index_sequence<sizeof...(Types) - 1>{});
         }
     };
@@ -202,9 +206,7 @@ export namespace parser::mxns {
             NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 auto prefSt = PrefieldsSt::parse(readPtr);
                 auto base = Base::parse(readPtr);
-                if (!(prefSt && base)) [[unlikely]] {
-                    return std::nullopt;
-                }
+                ul_assert_nullopt(prefSt && base);
                 return std::optional{Self{*std::move(prefSt), *std::move(base)}};
             }
 
@@ -213,28 +215,32 @@ export namespace parser::mxns {
             NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
                 auto prefSt = PrefieldsSt::parse(readPtr);
                 auto base = Base::parse(std::move(readPtr));
-                if (!(prefSt && base)) [[unlikely]] {
-                    return std::nullopt;
-                }
+                ul_assert_nullopt(prefSt && base);
                 return std::optional{Self{*std::move(prefSt), *std::move(base)}};
             }
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PrefieldsSt, SpecR>
             NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return PrefieldsSt::check_and_move(readPtr) && Base::check_and_move(readPtr);
+                ul_assert_false(PrefieldsSt::check_and_move(readPtr));
+                ul_assert_false(Base::check_and_move(readPtr));
+                return true;
             }
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PrefieldsSt, SpecR>
             NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-                return PrefieldsSt::check_and_move(readPtr) && Base::check_and_move(std::move(readPtr));
+                ul_assert_false(PrefieldsSt::check_and_move(readPtr));
+                ul_assert_false(Base::check_and_move(std::move(readPtr)));
+                return true;
             }
 
-            template <typename SpecW>
+            template <typename SpecW, typename DirSelf>
                 requires JaacDeserable<Base, SpecW> && JaacDeserable<PrefieldsSt, SpecW>
-            bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-                return static_cast<PrefieldsSt>(self).deser(writePtr) && static_cast<Base>(self).deser(writePtr);
+            bool deser(this DirSelf&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                ul_assert_false(cstd::forward_static_cast<PrefieldsSt>(std::forward<DirSelf>(self)).deser(writePtr));
+                ul_assert_false(cstd::forward_static_cast<Base>(std::forward<DirSelf>(self)).deser(writePtr));
+                return true;
             }
         };
     } // namespace internal
@@ -249,8 +255,8 @@ export namespace parser::mxns {
         using Base3 = internal::AddPrefieldsWMxnMethodsPart<Base, PrefieldsSt, AddPrefieldsWMxn>;
         friend Base3;
 
-        constexpr AddPrefieldsWMxn(PrefieldsSt prefieldsStruct, Base base) noexcept :
-            Base2(prefieldsStruct), Base(base) {
+        constexpr AddPrefieldsWMxn(PrefieldsSt&& prefieldsStruct, Base&& base) noexcept :
+            Base2(std::move(prefieldsStruct)), Base(std::move(base)) {
         }
 
     public:
@@ -269,8 +275,7 @@ export namespace parser::mxns {
             NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>& readPtr) noexcept {
                 /*opt<Base>*/ auto base = Base::parse(readPtr);
                 /*opt<PostfieldsSt>*/ auto postSt = PostfieldsSt::parse(readPtr);
-                if (!(base && postSt)) [[unlikely]]
-                    return std::nullopt;
+                ul_assert_nullopt(base && postSt);
                 return std::optional{Self{*std::move(base), *std::move(postSt)}};
             }
 
@@ -279,27 +284,32 @@ export namespace parser::mxns {
             NODISCARD static std::optional<Self> parse(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
                 /*opt<Base>*/ auto base = Base::parse(readPtr);
                 /*opt<PostfieldsSt>*/ auto postSt = PostfieldsSt::parse(std::move(readPtr));
-                if (!(base && postSt)) [[unlikely]]
-                    return std::nullopt;
+                ul_assert_nullopt(base && postSt);
                 return std::optional{Self{*std::move(base), *std::move(postSt)}};
             }
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PostfieldsSt, SpecR>
             NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>& readPtr) noexcept {
-                return Base::check_and_move(readPtr) && PostfieldsSt::check_and_move(readPtr);
+                ul_assert_false(Base::check_and_move(readPtr));
+                ul_assert_false(PostfieldsSt::check_and_move(readPtr));
+                return true;
             }
 
             template <typename SpecR>
                 requires JaacParsable<Base, SpecR> && JaacParsable<PostfieldsSt, SpecR>
             NODISCARD static bool check_and_move(ReadPtrBySpec<SpecR>&& readPtr) noexcept {
-                return Base::check_and_move(readPtr) && PostfieldsSt::check_and_move(std::move(readPtr));
+                ul_assert_false(Base::check_and_move(readPtr));
+                ul_assert_false(PostfieldsSt::check_and_move(std::move(readPtr)));
+                return true;
             }
 
-            template <typename SpecW>
+            template <typename SpecW, typename DirSelf>
                 requires JaacDeserable<Base, SpecW> && JaacDeserable<PostfieldsSt, SpecW>
-            bool deser(this auto&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
-                return static_cast<Base>(self).deser(writePtr) && static_cast<PostfieldsSt>(self).deser(writePtr);
+            bool deser(this DirSelf&& self, WritePtrBySpec<SpecW>& writePtr) noexcept {
+                ul_assert_false(cstd::forward_static_cast<Base>(std::forward<DirSelf>(self)).deser(writePtr));
+                ul_assert_false(cstd::forward_static_cast<PostfieldsSt>(std::forward<DirSelf>(self)).deser(writePtr));
+                return true;
             }
         };
     } // namespace internal
@@ -314,8 +324,8 @@ export namespace parser::mxns {
         using Base3 = internal::AddPostfieldsWMxnMethodsPart<Base, PostfieldsSt, AddPostfieldsWMxn>;
         friend Base3;
 
-        constexpr AddPostfieldsWMxn(Base base, PostfieldsSt prefieldsStruct) noexcept :
-            Base(base), Base2(prefieldsStruct), Base3() {
+        constexpr AddPostfieldsWMxn(Base&& base, PostfieldsSt&& prefieldsStruct) noexcept :
+            Base(std::move(base)), Base2(std::move(prefieldsStruct)), Base3() {
         }
 
     public:

@@ -9,6 +9,7 @@ module;
 #include <type_traits>
 
 #include "macro.h"
+import macro_u;
 
 export module simple_cstd;
 
@@ -246,6 +247,11 @@ export namespace cstd {
         return new T(std::forward<TD>(obj));
     }
 
+    template <typename ClearT2, typename DirT1>
+    NODISCARD F_INLINE decltype(auto) forward_static_cast(DirT1&& t1) noexcept(noexcept(static_cast<copy_cv_eref<ClearT2, DirT1&&>>(std::forward<DirT1>(t1)))) {
+        return static_cast<copy_cv_eref<ClearT2, DirT1&&>>(std::forward<DirT1>(t1));
+    }
+
     template <typename TD>
     NODISCARD auto copy_to_heap_if_noempty(TD&& obj) noexcept {
         using T = std::remove_cvref_t<TD>;
@@ -301,8 +307,7 @@ export namespace cstd {
 
     template <typename T>
     NODISCARD std::optional<T> opt_impl_construct(auto&& from) noexcept {
-        if (!from) [[unlikely]]
-            return std::nullopt;
+        ul_assert_nullopt(from);
         return std::optional{T(std::forward_like<decltype(from)>(*from))};
     }
 

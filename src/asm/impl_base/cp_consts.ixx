@@ -465,7 +465,7 @@ export namespace cp_consts {
     bool parse1_const_big_ctx(DirReadPtr&& readPtr, auto&& handler) noexcept {
         PARSE_OR_RET_FALSE(TagIdTypeT, tagId);
 
-        auto handle_lambda = [&readPtr] <typename Trait> () mutable {
+        auto handle_lambda = [&readPtr]<typename Trait>() mutable {
             if constexpr (handle) {
                 if (auto value = Trait::parse(std::forward<DirReadPtr>(readPtr))) {
                     return traits::opt_cp_var{traits::cp_var{*value}};
@@ -492,8 +492,8 @@ export namespace cp_consts {
     }
 
     template <parser::ParseJaacComplexCollMode mode, typename SpecR>
-    NODISCARD constexpr bool opt_parse_cpool_coll(parser::ReadPtrBySpec<SpecR>& readPtr, const parser::CpoolRSizeT cpoolSize,
-                                                  auto& cpoolJaacColl) noexcept {
+    NODISCARD constexpr bool opt_parse_cpool_coll(parser::ReadPtrBySpec<SpecR>& readPtr,
+                                                  const parser::CpoolRSizeT cpoolSize, auto& cpoolJaacColl) noexcept {
         using namespace parser;
 
         auto skipIdxInColl = [&](bool& isUnex) {
@@ -545,6 +545,15 @@ export namespace cp_consts {
         bool parseCpoolStructure = false;
     };
 
+    template <typename T>
+    concept HasIsLongDoubleMethod = requires(const T t) {
+        { t.is_long_double() } -> std::same_as<bool>;
+    };
+
+    struct CpoolElemAddedResult {
+        bool isLongDouble;
+    };
+
     namespace internal {
         template <typename ElemT, JaacCpoolVectorTySettings settings, typename Self>
         struct CpoolJaacVectorMethodsPMxn {
@@ -577,7 +586,6 @@ export namespace cp_consts {
                 return true;
             }
 
-
             template <typename SpecR>
             NODISCARD static bool check_and_move(parser::ReadPtrBySpec<SpecR>&& readPtr) noexcept {
                 return check_and_move(readPtr);
@@ -599,5 +607,31 @@ export namespace cp_consts {
     public:
         using Base3::check_and_move;
         using Base3::parse;
+
+        CpoolElemAddedResult jaac_push_back_offseted(ElemT&& elem) noexcept
+            requires HasIsLongDoubleMethod<ElemT>
+        {
+            const bool hasOffset = elem.is_long_double();
+            this->push_back(std::move(elem));
+
+            if (hasOffset) {
+                this->emplace_back(traits::cp_var{});
+            }
+
+            return {hasOffset};
+        }
+
+        CpoolElemAddedResult jaac_push_back_offseted(const ElemT& elem) noexcept
+            requires HasIsLongDoubleMethod<ElemT>
+        {
+            const bool hasOffset = elem.is_long_double();
+            this->push_back(elem);
+
+            if (hasOffset) {
+                this->emplace_back(traits::cp_var{});
+            }
+
+            return {hasOffset};
+        }
     };
 } // namespace cp_consts
